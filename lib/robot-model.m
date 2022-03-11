@@ -2,7 +2,6 @@ clear all, close all, clc
 addpath(genpath("./")) % Add lib path to Octave script file search paths
 
 pkg load control
-pkg load signal
 
 run util-functions
 
@@ -23,8 +22,19 @@ La = 0.00011; # armature inductance (H)
 Ra = 1.69;    # armature resistance (Ω)
 Kv = 0.0059;  # motor velocity constant (V olts/rad/s)
 Kt = 0.0059;  # torque constant (N.m/A)
+gmma = deg2rad(30); # Angle between orthoganal axes and robot wheels (rad)
+
+# Forward Kinematic transformation matrix
+G = \
+[
+  0           -1        L;
+  cos(gmma)   sin(gmma) L;
+  -cos(gmma)  sin(gmma) L
+];
+
 
 sampling_period = 60e-3;
+dt = 0.001;
 
 # Plant dynamic discrete matrix
 
@@ -36,7 +46,8 @@ A = \
   a11  0    0;
   0    a22  0;
   0    0    a33;
-]
+];
+Ae = (eye(size(A)) - dt*A); # To use in Euler Approximation Rule
 
 B = \
 [
@@ -44,13 +55,30 @@ B = \
   -1/M  1/(2*M)         1/(2*M)
   L/Mt  L/Mt           L/Mt
 ];
-B = ((nr*Kt)/(Ra*r))*B
+B = ((nr*Kt)/(Ra*r))*B;
+Be = dt*B;
 
-C = eye(3)
+C = eye(3);
 
 states = {'v', 'vn', 'w'};
 continous_model = ss(A, B, C, 0,
                     'stname', states, 'outname', states,
                     'name', 'Robot Model');
 
+euler_rule_model = ss(Ae, Be, C, 0,
+                      'stname', states, 'outname', states,
+                      'name', 'Robot Model');
 discrete_model = c2d(continous_model, sampling_period)
+
+function v = inverse_kinematics(M, x)
+    v =  M*x;
+endfunction
+
+function x = forward_kinematics(M, v)
+    x = inv(M)*v;
+endfunction
+
+function v = robot(ss_model, M, x0, u)
+    [xt_plus_dt, yt] = get_ss_output(x0,ss_model, u);
+    v = inverse_kinematics(M, yt);
+endfunction
