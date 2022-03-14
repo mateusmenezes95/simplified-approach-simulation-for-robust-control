@@ -25,7 +25,7 @@ Kt = 0.0059;  # torque constant (N.m/A)
 gmma = deg2rad(30); # Angle between orthoganal axes and robot wheels (rad)
 
 # Forward Kinematic transformation matrix
-G = \
+global G = ...
 [
   0           -1        L;
   cos(gmma)   sin(gmma) L;
@@ -34,7 +34,7 @@ G = \
 
 
 sampling_period = 60e-3;
-dt = 0.001;
+global dt = sampling_period/100;
 
 # Plant dynamic discrete matrix
 
@@ -47,7 +47,7 @@ A = \
   0    a22  0;
   0    0    a33;
 ];
-Ae = (eye(size(A)) - dt*A); # To use in Euler Approximation Rule
+Ae = (eye(size(A)) + dt*A); # To use in Euler Approximation Rule
 
 B = \
 [
@@ -65,20 +65,28 @@ continous_model = ss(A, B, C, 0,
                     'stname', states, 'outname', states,
                     'name', 'Robot Model');
 
-euler_rule_model = ss(Ae, Be, C, 0,
-                      'stname', states, 'outname', states,
-                      'name', 'Robot Model');
+global euler_rule_model = ss(Ae, Be, C, 0,
+                             'stname', states, 'outname', states,
+                             'name', 'Robot Model');
 discrete_model = c2d(continous_model, sampling_period)
 
-function v = inverse_kinematics(M, x)
-    v =  M*x;
+function v = inverse_kinematics(x)
+  global G;
+  v = G*x;
 endfunction
 
-function x = forward_kinematics(M, v)
-    x = inv(M)*v;
+function x = forward_kinematics(v)
+  global G;
+  x = inv(G)*v;
 endfunction
 
-function v = robot(ss_model, M, x0, u)
-    [xt_plus_dt, yt] = get_ss_output(x0,ss_model, u);
-    v = inverse_kinematics(M, yt);
+function [xt_plus_dt, v] = robot(x0, u)
+  global euler_rule_model;
+  [xt_plus_dt, yt] = get_ss_output(x0,euler_rule_model, u);
+  v = inverse_kinematics(x0); % Return [vm1 vm2 vm3]'
+endfunction
+
+function p = compute_odometry(p0, x)
+  global dt;
+  p = rotz(p0(3,1))*x*dt + p0;
 endfunction
