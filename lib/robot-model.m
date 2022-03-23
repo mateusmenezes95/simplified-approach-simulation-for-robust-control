@@ -57,7 +57,7 @@ B = \
   -1/M  1/(2*M)         1/(2*M)
   L/Mt  L/Mt           L/Mt
 ];
-B = ((nr*Kt)/(Ra*r))*B;
+B = ((nr*Kt)/(Ra*wr))*B;
 Be = integration_step*B;
 
 C = eye(3);
@@ -109,7 +109,7 @@ function [xt_plus_dt, v] = robot(xt_dt, u)
 endfunction
 
 function p = compute_odometry(p0, x)
-  global dt;
+  global integration_step;
   theta = p0(3,1);
   p = rotz(theta)*x*integration_step + p0;
 endfunction
