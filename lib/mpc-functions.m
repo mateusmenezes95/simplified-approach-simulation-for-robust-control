@@ -27,8 +27,8 @@ function [A_pred, B_pred, C_pred] = preditor_params(A, B, C, Np, Nu)
 end
 
 function [Kw, Kmpc, Qaug, Raug] = get_mpc_gains(Ap, Bp, Cp, q, r, Np, Nu)
-  Qaug = eye(size(Ap,1)/2)*q;
-  Raug = eye(size(Ap,1)/2)*r;
+  Qaug = eye(size(Ap,2)*Np/2)*q;
+  Raug = eye(size(Bp,2))*r;
   common_factor = inv((Bp'*Cp'*Qaug*Cp*Bp)+Raug)*Bp'*Cp'*Qaug';
   Kw = common_factor;
   Kmpc = common_factor*Cp*Ap;
