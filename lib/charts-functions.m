@@ -25,6 +25,9 @@ function plot_robot_states(t, x, states_name)
   for i=1:num_states
     subplot(num_states, 1, i)
     plot(t, x(i,:), 'linewidth', line_thickness)
+    if i == 1
+      title("Robot states $[V V_n \\omega]^T$ over time")
+    endif
     grid on
     xlabel('Tempo (s)');
     if i < 3
@@ -44,6 +47,9 @@ function plot_robot_velocities(t, v)
   for i=1:num_velocities
     subplot(num_velocities, 1, i)
     plot(t, v(i,:), 'linewidth', line_thickness)
+    if i == 1
+      title("Robot wheels velocities $[V_{m1} V_{m2} V_{m3}]^T$ over time")
+    endif
     grid on
     xlabel('Tempo (s)');
     ylabel(['$V_{m' num2str(i) '}(t)$ [m/s]']);
@@ -55,6 +61,7 @@ function plot_robot_trajectory(x, y)
   global line_thickness;
 
   plot(x, y, 'linewidth', line_thickness)
+  title("Robot Trajectory")
   grid on
   xlabel('x [m]')
   ylabel('y [m]')
