@@ -26,7 +26,7 @@ discrete_y_ref(1,step_begin_idx:end) = ones(1, (length(discrete_samples)-step_be
 % MPC Initialization
 %=======================================================================================================================
 [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
-[Kw, Kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, 100, 1);
+[Kw, Kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, 100, 1, prediction_horizon, control_horizon);
 
 %=======================================================================================================================
 % Inital conditions of the plant
@@ -97,3 +97,5 @@ figure(2)
 plot_robot_velocities(t,wheels_linear_vel);
 figure(3)
 plot_robot_trajectory(xr, yr)
+figure(4)
+plot_control_signals(t,continous_u);

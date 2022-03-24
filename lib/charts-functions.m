@@ -56,6 +56,24 @@ function plot_robot_velocities(t, v)
   endfor
 endfunction
 
+function plot_control_signals(t, u)
+  global font_size;
+  global line_thickness;
+
+  control_signals = size(u, 1);
+
+  for i=1:control_signals
+    subplot(control_signals, 1, i)
+    plot(t, u(i,:), 'linewidth', line_thickness)
+    if i == 1
+      title("Voltage applied to robot wheels motors over time")
+    endif
+    grid on
+    xlabel('Tempo (s)');
+    ylabel(['$u_{m' num2str(i) '}(t)$ [V]']);
+  endfor
+endfunction
+
 function plot_robot_trajectory(x, y)
   global font_size;
   global line_thickness;
