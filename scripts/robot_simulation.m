@@ -1,11 +1,11 @@
 addpath(genpath("../lib")) % Add lib path to Octave script file search paths
 
-run simulation-parameters
-run util-functions
-run robot-model
-run charts-functions
-run trajectory-functions
-run mpc-functions
+run simulation_parameters
+run util_functions
+run robot_model
+run charts_functions
+run trajectory_functions
+run mpc_functions
 
 %=======================================================================================================================
 % Simulation time parameters
