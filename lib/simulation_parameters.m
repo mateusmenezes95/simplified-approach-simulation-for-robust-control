@@ -1,6 +1,8 @@
 sampling_period = 60e-3;
 sampling_period_integration_step_ratio = 100;
-global integration_step = sampling_period/sampling_period_integration_step_ratio;
+global integration_step
+
+integration_step = sampling_period/sampling_period_integration_step_ratio;
 
 prediction_horizon = 4;  % Prediction Horizon
 control_horizon = 4;  % Control Horizon

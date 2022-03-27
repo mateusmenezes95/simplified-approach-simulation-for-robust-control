@@ -15,9 +15,9 @@ function [x_points, y_points, v] = generate_circle_trajectory(radius, v_nav, t)
       v(3,j) = phi(j) - phi(j-1);
     else
       v(3,j) = phi(j) - initial_theta;
-    endif
-  endfor
-endfunction
+    end
+  end
+end
 
 function waypoints = generate_square_trajectory(square_size, nav_vel, sampling_period)
   path_nav_time = (square_size*4)/nav_vel;
@@ -37,4 +37,4 @@ function waypoints = generate_square_trajectory(square_size, nav_vel, sampling_p
   y = [zeros(1, length(x1))'; y1'; ones(1, length(x2))'; y2'];
 
   waypoints = [x y theta]';
-endfunction
+end

@@ -32,7 +32,7 @@ function [Kw, Kmpc, Qaug, Raug] = get_mpc_gains(Ap, Bp, Cp, q, r, Np, Nu)
   common_factor = inv((Bp'*Cp'*Qaug*Cp*Bp)+Raug)*Bp'*Cp'*Qaug';
   Kw = common_factor;
   Kmpc = common_factor*Cp*Ap;
-endfunction
+end
 
 % Future references must be in Y = [yr(k) yr(k+1) ... yr(k+N-1)]
 function horizon_refs = get_horizon_references(k, prediction_horizon, future_refs)
@@ -42,9 +42,9 @@ function horizon_refs = get_horizon_references(k, prediction_horizon, future_ref
       horizon_refs = [horizon_refs; future_refs(:,end)];  % Keeps the last reference
     else
       horizon_refs = [horizon_refs; future_refs(:,j)];
-    endif
-  endfor
-endfunction
+    end
+  end
+end
 
 % Future references must be in Y = [yr(k) yr(k+1) ... yr(k+N-1)]
 function horizon_refs = get_square_trajectory_horizon_references(k, actual_pose, prediction_horizon, waypoints, nav_vel)
@@ -54,15 +54,15 @@ function horizon_refs = get_square_trajectory_horizon_references(k, actual_pose,
   horizon_refs = [];
   for j=k:k+prediction_horizon-1
     if j > length(waypoints)
-      phi = atan2(waypoints(y,end)-actual_pose(y), waypoints(x,end)-actual_pose(x))  # atan2(yr(k + j|k) - yr(k), xr(k + j|k) − xr(k))
+      phi = atan2(waypoints(y,end)-actual_pose(y), waypoints(x,end)-actual_pose(x))  % atan2(yr(k + j|k) - yr(k), xr(k + j|k) − xr(k))
       temp_vec = [nav_vel*cos(phi) nav_vel*sin(phi) (waypoints(theta,end) - actual_pose(theta))]';
       temp_vec = rotz(actual_pose(theta))*temp_vec;
       horizon_refs = [horizon_refs; temp_vec];
     else
-      phi = atan2(waypoints(y,j)-actual_pose(y), waypoints(x,j)-actual_pose(x))  # atan2(yr(k + j|k) - yr(k), xr(k + j|k) − xr(k))
+      phi = atan2(waypoints(y,j)-actual_pose(y), waypoints(x,j)-actual_pose(x))  % atan2(yr(k + j|k) - yr(k), xr(k + j|k) − xr(k))
       temp_vec = [nav_vel*cos(phi) nav_vel*sin(phi) (waypoints(theta,j) - actual_pose(theta))]';
       temp_vec = rotz(actual_pose(theta))*temp_vec
       horizon_refs = [horizon_refs; temp_vec];
-    endif
-  endfor
-endfunction
+    end
+  end
+end

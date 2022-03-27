@@ -2,9 +2,15 @@
 % Defaul parameters
 % =============================================================================
 
-global font_size = 10;
-global line_thickness = 1;
-global y_axis_limits_offset = 0.2;
+global font_size
+global line_thickness
+global y_axis_limits_offset
+
+
+font_size = 10;
+line_thickness = 1;
+y_axis_limits_offset = 0.2;
+
 
 % =============================================================================
 % Functions
@@ -27,16 +33,16 @@ function plot_robot_states(t, x, states_name)
     plot(t, x(i,:), 'linewidth', line_thickness)
     if i == 1
       title("Robot states $[V V_n \\omega]^T$ over time")
-    endif
+    end
     grid on
     xlabel('Tempo (s)');
     if i < 3
       ylabel([states_name{i} ' [m/s]']);
     else
       ylabel([states_name{i} ' [rad/s]']);
-    endif
-  endfor
-endfunction
+    end
+  end
+end
 
 function plot_robot_velocities(t, v)
   global font_size;
@@ -49,12 +55,12 @@ function plot_robot_velocities(t, v)
     plot(t, v(i,:), 'linewidth', line_thickness)
     if i == 1
       title("Robot wheels velocities $[V_{m1} V_{m2} V_{m3}]^T$ over time")
-    endif
+    end
     grid on
     xlabel('Tempo (s)');
     ylabel(['$V_{m' num2str(i) '}(t)$ [m/s]']);
-  endfor
-endfunction
+  end
+end
 
 function plot_control_signals(t, u)
   global font_size;
@@ -67,12 +73,12 @@ function plot_control_signals(t, u)
     plot(t, u(i,:), 'linewidth', line_thickness)
     if i == 1
       title("Voltage applied to robot wheels motors over time")
-    endif
+    end
     grid on
     xlabel('Tempo (s)');
     ylabel(['$u_{m' num2str(i) '}(t)$ [V]']);
-  endfor
-endfunction
+  end
+end
 
 function plot_robot_trajectory(x, y)
   global font_size;
@@ -83,4 +89,4 @@ function plot_robot_trajectory(x, y)
   grid on
   xlabel('x [m]')
   ylabel('y [m]')
-endfunction
+end
