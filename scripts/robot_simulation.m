@@ -1,10 +1,10 @@
 addpath(genpath("../lib")) % Add lib path to Octave script file search paths
+addpath(genpath("../lib/mpc_functions")) % Add lib path to Octave script file search paths
 
 run simulation_parameters
 run robot_model
 run charts_functions
 run trajectory_functions
-run mpc_functions
 
 %=======================================================================================================================
 % Simulation time parameters
@@ -13,7 +13,7 @@ sim_time = 3;
 step_begin = sampling_period;
 step_begin_idx = floor(step_begin/sampling_period);
 t = 0:integration_step:sim_time;
-discrete_samples = floor(sim_time/sampling_period)
+discrete_samples = floor(sim_time/sampling_period);
 
 %=======================================================================================================================
 % Reference computation
