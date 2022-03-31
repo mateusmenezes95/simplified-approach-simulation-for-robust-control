@@ -2,3 +2,5 @@ octave-workspace
 
 .vscode/
 lib/*.asv
+slprj/
+*.slxc
