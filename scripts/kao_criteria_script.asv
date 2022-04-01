@@ -15,17 +15,17 @@ print_section_description("Calculating controller gains")
 [A_pred, B_pred, C_pred] = ... 
     preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
 
-q = 0.1:0.1:10;
+
+q = 0.1:0.1:20;
 Nmax_vector = zeros(size(q));
 Cnorm_vector = zeros(size(q));
-r=10;
+r=1000;
 loop_index= 1;
 for q_sample = q
-    [Nmax, Cnorm] = kao_criteria(A_pred, B_pred, C_pred, q_sample, r, ...
-        prediction_horizon, control_horizon, robot_discrete_model);
+    [Nmax, Cnorm] = kao_criteria(A_pred, B_pred, C_pred, q_sample, r, prediction_horizon, control_horizon, robot_discrete_model);
     Nmax_vector(loop_index) = Nmax;
     Cnorm_vector(loop_index) = Cnorm;
-    loop_index = loop_index + 1;
+    loop_index = loop_index+1;
 end
 
 plot(q,Cnorm_vector)
