@@ -10,7 +10,7 @@ function waypoints = generate_square_trajectory(square_size, nav_vel, sampling_p
   x2 = zeros(1,waypoints_qty);
   theta = [theta; deg2rad(ones(1,length(x2))*180)'];
   y2 = zeros(1,waypoints_qty);
-  theta = [theta; deg2rad(ones(1,length(y2))*0)'];
+  theta = [theta; deg2rad(ones(1,length(y2))*270)'];
 
   x = [x1'; ones(1,length(y1))'; x2'; zeros(1, length(y2))'];
   y = [zeros(1, length(x1))'; y1'; ones(1, length(x2))'; y2'];
