@@ -1,6 +1,7 @@
 octave-workspace
 
 .vscode/
-lib/*.asv
+*.asv
 slprj/
 *.slxc
+*.slx.original
