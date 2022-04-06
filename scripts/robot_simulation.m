@@ -1,11 +1,10 @@
 addpath(genpath("../lib")) % Add lib path to Octave script file search paths
+addpath(genpath("../lib/mpc_functions")) % Add lib path to Octave script file search paths
 
-run simulation-parameters
-run util-functions
-run robot-model
-run charts-functions
-run trajectory-functions
-run mpc-functions
+run simulation_parameters
+run robot_model
+run charts_functions
+run trajectory_functions
 
 %=======================================================================================================================
 % Simulation time parameters
@@ -14,7 +13,7 @@ sim_time = 3;
 step_begin = sampling_period;
 step_begin_idx = floor(step_begin/sampling_period);
 t = 0:integration_step:sim_time;
-discrete_samples = floor(sim_time/sampling_period)
+discrete_samples = floor(sim_time/sampling_period);
 
 %=======================================================================================================================
 % Reference computation
@@ -58,7 +57,7 @@ for dt=1:length(t)
       delta_x(:,k) = discrete_x(:,k) - discrete_x0;
     else
       delta_x(:,k) = discrete_x(:,k) - discrete_x(:,k-1);
-    endif
+    end
 
     horizon_references = get_horizon_references(k+1, prediction_horizon, discrete_y_ref);
     ksi(:,k) = [delta_x(:,k); discrete_y(:,k)];
@@ -68,12 +67,12 @@ for dt=1:length(t)
       discrete_u(:,k) = delta_u(1:state_vector_size,k) + discrete_u0;
     else
       discrete_u(:,k) = delta_u(1:state_vector_size,k) + discrete_u(:,k-1);
-    endif
+    end
 
     ukk = discrete_u(:, k);
 
     k = k+1;
-  endif
+  end
 
   continous_u(:,dt) = ukk;
 
@@ -83,8 +82,8 @@ for dt=1:length(t)
     robot_pose(:,dt) = compute_odometry(robot_pose0, continous_x(:,dt));
   else
     robot_pose(:,dt) = compute_odometry(robot_pose(:,dt-1), continous_x(:,dt));
-  endif
-endfor
+  end
+end
 
 continous_x = continous_x(:,1:end-1);
 
