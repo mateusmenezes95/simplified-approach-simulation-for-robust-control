@@ -22,4 +22,3 @@ function [Nmax, CNorm] = kao_criteria(Apred, Bpred, Cpred, q, r, Np, Nu, model)
         Nmax = floor(1/CNorm);
     end
 end
-

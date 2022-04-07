@@ -3,4 +3,3 @@ function [] = print_section_description(description)
     disp(description)
     disp("===================================================================")
 end
-

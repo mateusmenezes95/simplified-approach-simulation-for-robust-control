@@ -6,8 +6,6 @@ addpath(genpath("./")) % Add lib path to Octave script file search paths
 
 run simulation_parameters
 
-print_section_description("Plant State Space Model")
-
 Bv = 0.7;      % viscous friction relative to v (N/m/s)
 Bvn = 0.7;     % viscous friction relative to v n (N/m/s)
 Bw = 0.011;   % viscous friction relative to ω (N/rad/s)
@@ -51,7 +49,6 @@ A = ...
   0    a22  0;
   0    0    a33;
 ];
-Ae = (eye(size(A)) + integration_step*A); % To use in Euler Approximation Rule
 
 B = ...
 [
@@ -60,7 +57,6 @@ B = ...
   L/Mt  L/Mt           L/Mt
 ];
 B = ((nr*Kt)/(Ra*wr))*B;
-Be = integration_step*B;
 
 C = eye(3);
 Ce = C;
@@ -71,11 +67,8 @@ state_vector_size = 3;
 robot_continous_model = ss(A, B, C, 0, ...
                           'StateName', states, 'OutputName', states, ...
                           'Name', 'Robot Model');
-global robot_euler_rule_model
-robot_euler_rule_model = ss(Ae, Be, Ce, 0, ...
-                                   'StateName', states, 'OutputName', states, ...
-                                   'Name', 'Robot Model');
-robot_discrete_model = c2d(robot_continous_model, sampling_period)
+
+robot_discrete_model = c2d(robot_continous_model, sampling_period);
 
 Ad = robot_discrete_model.A;
 Bd = robot_discrete_model.B;
@@ -95,24 +88,12 @@ Baug = ...
 
 Caug = [zeros(state_vector_size) eye(state_vector_size)];
 
-function v = inverse_kinematics(x)
-  global G;
+print_section_description("State Space Model Loaded")
+
+function v = inverse_kinematics(x, G)
   v = G*x;
 end
 
-function x = forward_kinematics(v)
-  global G;
-  x = inv(G)*v;
-end
-
-function [xt_plus_dt, v] = robot(xt_dt, u)
-  global robot_euler_rule_model;
-  xt_plus_dt = robot_euler_rule_model.A*xt_dt + robot_euler_rule_model.B*u;
-  v = inverse_kinematics(xt_dt); % Return [vm1 vm2 vm3]'
-end
-
-function p = compute_odometry(p0, x)
-  global integration_step;
-  theta = p0(3,1);
-  p = rotz(theta)*x*integration_step + p0;
+function x = forward_kinematics(v, G)
+  x = G\v;
 end

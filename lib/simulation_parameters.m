@@ -1,11 +1,7 @@
-sampling_period = 1e-3;
-sampling_period_integration_step_ratio = 100;
-global integration_step
+addpath(genpath("../lib"))
 
-integration_step = sampling_period/sampling_period_integration_step_ratio;
+sampling_period = 10e-3;
+prediction_horizon = 10;  % Prediction Horizon
+control_horizon = 4;  % Control Horizon
 
-prediction_horizon = 200;  % Prediction Horizon
-control_horizon = 100;  % Control Horizon
-r = 1;    % Reference error weight matrix R = r*I
-q = 1;    % Control effort weight matrix Q = q*I
-
+print_section_description("Simulation parameters loaded")
