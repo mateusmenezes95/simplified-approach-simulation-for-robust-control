@@ -1,9 +1,9 @@
 function waypoints = generate_square_trajectory(square_size, nav_vel, sampling_period)
   path_nav_time = (square_size*4)/nav_vel;
   waypoints_qty = ceil((path_nav_time/sampling_period)/4);
-  waypoint_step = square_size/waypoints_qty;
 
   x1 = ones(1,waypoints_qty);
+  x1(1,1) = 0;
   theta = zeros(1,length(x1))';
   y1 = ones(1,waypoints_qty);
   theta = [theta; deg2rad(ones(1,length(y1))*90)'];

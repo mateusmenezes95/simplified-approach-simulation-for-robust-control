@@ -17,7 +17,7 @@ function [Nmax, CNorm] = kao_criteria(Apred, Bpred, Cpred, q, r, Np, Nu, model)
     Kao_sys = ((z-1)/z)*C_sens;
 
     CNorm = norm(Kao_sys, Inf);
-    Nmax = -1;
+    Nmax = 0;
     if CNorm < 1
         Nmax = floor(1/CNorm);
     end
