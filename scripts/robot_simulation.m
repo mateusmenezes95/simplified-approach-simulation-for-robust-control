@@ -55,7 +55,7 @@ for i=1:length(N_vec)
     %==============================================================================
 
     print_section_description(['Running Robot Simulation on Simulink with parameters: ' loop_step_params_str])
-    sim_out = sim('./simulink/robot.slx');
+    sim_out = sim('./simulink/robot_2021a.slx');
     print_section_description("Robot Simulation Finished!")
     %==============================================================================
 
