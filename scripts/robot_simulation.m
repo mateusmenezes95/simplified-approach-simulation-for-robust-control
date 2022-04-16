@@ -11,7 +11,7 @@ x_trajectory = square_trajectory(1,:);
 y_trajectory = square_trajectory(2,:);
 waypoints_qty = length(square_trajectory);
 
-sim_time = 90;  % Choosen due results inpection
+sim_time = 100;  % Choosen due results inpection
 
 %==============================================================================
 % Plot Parameters
