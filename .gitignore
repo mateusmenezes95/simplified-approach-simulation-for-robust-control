@@ -5,3 +5,5 @@ octave-workspace
 slprj/
 *.slxc
 *.slx.original
+
+images/
