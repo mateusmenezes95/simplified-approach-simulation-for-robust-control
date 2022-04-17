@@ -5,7 +5,7 @@ function plot_control_signals(t, u, legend_name, line_spec, line_thickness)
     subplot(control_signals, 1, i)
     if(legend_name ~= -1)
       plot(t, u(:,i), line_spec, 'linewidth', line_thickness, 'DisplayName', legend_name)
-      legend
+      legend(Location="best")
     else
       plot(t, u(:,i), line_spec, 'linewidth', line_thickness)
     end
