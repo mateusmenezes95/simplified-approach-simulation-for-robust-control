@@ -21,6 +21,7 @@ line_thickness = 1;
 y_axis_limits_offset = 0.2;
 figure_idx = 1;
 plot_step_response = false;
+trajectory_limits =  [-0.05 1.05];
 %==============================================================================
 
 % Simulated scenarios in the next foo loop:
@@ -61,8 +62,8 @@ for i=1:length(Nmax_vec)
     %==============================================================================
     figure('Name', ['Trajectory | params: ' loop_step_params_str])
     plot_robot_trajectory(x_trajectory, y_trajectory, 'referencia', '--k', line_thickness)
-    xlim([-0.2 1.2]);
-    ylim([-0.2 1.2]);
+    xlim(trajectory_limits);
+    ylim(trajectory_limits);
     hold on
     plot_robot_trajectory(sim_out.x, sim_out.y, 'Robô', line_style, line_thickness)
     %==============================================================================
@@ -150,8 +151,8 @@ for i=1:length(Nmax_vec)
     [figures, figure_idx] = select_figure(figures, ['Trajectory | params: ' loop_step_params_str], i, figure_idx);
     if i == 1
         plot_robot_trajectory(x_trajectory, y_trajectory, 'referencia', '--k', line_thickness)
-        xlim([-0.2 1.2]);
-        ylim([-0.2 1.2]);
+        xlim(trajectory_limits);
+        ylim(trajectory_limits);
         hold on
     end
     plot_robot_trajectory(sim_out.x, sim_out.y, ['Nmax = ' num2str(Nmax)], plot_line_styles(i), line_thickness)
