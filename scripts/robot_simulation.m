@@ -22,6 +22,8 @@ y_axis_limits_offset = 0.2;
 figure_idx = 1;
 plot_step_response = false;
 trajectory_limits =  [-0.05 1.05];
+clipped_trajectory_start_time = 55;
+clipped_trajectory_end_time = 65;
 %==============================================================================
 
 % Simulated scenarios in the next foo loop:
@@ -124,7 +126,7 @@ N_vec = [0 2 3];
 loop_step_params_str = ['q = ' num2str(q) ', r = ' num2str(r) ' and N = ' num2str(N_vec)];
 print_section_description(['Running Robot Simulation on Simulink with parameters: ' loop_step_params_str])
 
-plot_line_styles = ["-.m", ":b", "-r"];
+plot_line_styles = ["-.m", "--b", "-r"];
 figures = [];
 
 for i=1:length(N_vec)
@@ -162,6 +164,20 @@ for i=1:length(N_vec)
     %==============================================================================
 
     %==============================================================================
+    % Plot clipped trajectories
+    %==============================================================================
+    [figures, figure_idx] = select_figure(figures, ['Clipped Trajectory | params: ' loop_step_params_str], i, figure_idx);
+    if i == 1
+        start_idx = find(sim_out.sim_time_sampled >= clipped_trajectory_start_time, 1);
+        end_idx = find(sim_out.sim_time_sampled >= clipped_trajectory_end_time, 1);
+        % plot_robot_trajectory(x_trajectory(start_idx:end_idx), y_trajectory(start_idx:end_idx), 'referencia', '--k', line_thickness)
+        % hold on
+    end
+    plot_robot_trajectory(sim_out.x(start_idx:end_idx), sim_out.y(start_idx:end_idx), ['N = ' num2str(N)], plot_line_styles(i), line_thickness)
+    hold on
+    %==============================================================================
+
+    %==============================================================================
     % Plot robot poses
     %==============================================================================
     [figures, figure_idx] = select_figure(figures, ['Pose | params: ' loop_step_params_str], i, figure_idx);
@@ -185,6 +201,19 @@ for i=1:length(N_vec)
     [figures, figure_idx] = select_figure(figures, ['Control Signals | params: ' loop_step_params_str], i, figure_idx);
     control_signals = [sim_out.u1 sim_out.u2 sim_out.u3];
     plot_control_signals(sim_out.sim_time_sampled, control_signals, ['N = ' num2str(N)], plot_line_styles(i), line_thickness)
+    hold on
+    %==============================================================================
+
+    %==============================================================================
+    % Plot cliped control signals
+    %==============================================================================
+    [figures, figure_idx] = select_figure(figures, ['Clipped Control Signals | params: ' loop_step_params_str], i, figure_idx);
+    control_signals = [sim_out.u1(start_idx:end_idx) sim_out.u2(start_idx:end_idx) sim_out.u3(start_idx:end_idx)];
+    plot_control_signals(sim_out.sim_time_sampled(start_idx:end_idx), control_signals, ['N = ' num2str(N)], plot_line_styles(i), 1.5*line_thickness)
+    for m=1:3
+        subplot(3,1,m)
+        xlim([clipped_trajectory_start_time clipped_trajectory_end_time])
+    end
     hold on
     %==============================================================================
 
