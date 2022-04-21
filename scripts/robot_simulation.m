@@ -38,7 +38,15 @@ N_vec = [0 1];
 
 line_style = '-b';
 
-for i=1:length(N_vec)
+if version('-release') == "2022a"
+    simulink_model = "robot.slx";
+else
+    simulink_model = "robot_2021a.slx";
+end
+
+print_section_description(strcat("Using ", simulink_model, "simulink file"));
+
+for i=1:length(Nmax_vec)
     %==============================================================================
     % MPC Initialization
     %==============================================================================
@@ -55,7 +63,7 @@ for i=1:length(N_vec)
     %==============================================================================
 
     print_section_description(['Running Robot Simulation on Simulink with parameters: ' loop_step_params_str])
-    sim_out = sim('./simulink/robot.slx');
+    sim_out = sim(strcat("./simulink/", simulink_model));
     print_section_description("Robot Simulation Finished!")
     %==============================================================================
 
