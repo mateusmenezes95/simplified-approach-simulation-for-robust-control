@@ -135,6 +135,7 @@ loop_step_params_str = ['q = ' num2str(q) ', r = ' num2str(r) ' and N = ' num2st
 print_section_description(['Running Robot Simulation on Simulink with parameters: ' loop_step_params_str])
 
 plot_line_styles = ["-.m", "--b", "-r"];
+clipped_plot_line_styles = ["-.m", ":b", "-r"];
 figures = [];
 
 for i=1:length(N_vec)
@@ -175,13 +176,16 @@ for i=1:length(N_vec)
     % Plot clipped trajectories
     %==============================================================================
     [figures, figure_idx] = select_figure(figures, ['Clipped Trajectory | params: ' loop_step_params_str], i, figure_idx);
+    f = figure(figures(figure_idx-1));
+    f.Position = [1435 712 732 617];
     if i == 1
         start_idx = find(sim_out.sim_time_sampled >= clipped_trajectory_start_time, 1);
         end_idx = find(sim_out.sim_time_sampled >= clipped_trajectory_end_time, 1);
         % plot_robot_trajectory(x_trajectory(start_idx:end_idx), y_trajectory(start_idx:end_idx), 'referencia', '--k', line_thickness)
         % hold on
     end
-    plot_robot_trajectory(sim_out.x(start_idx:end_idx), sim_out.y(start_idx:end_idx), ['N = ' num2str(N)], plot_line_styles(i), line_thickness)
+    plot_robot_trajectory(sim_out.x(start_idx:end_idx), sim_out.y(start_idx:end_idx), ['N = ' num2str(N)], clipped_plot_line_styles(i), line_thickness)
+    legend(Location="southeast")
     hold on
     %==============================================================================
 
@@ -216,11 +220,14 @@ for i=1:length(N_vec)
     % Plot cliped control signals
     %==============================================================================
     [figures, figure_idx] = select_figure(figures, ['Clipped Control Signals | params: ' loop_step_params_str], i, figure_idx);
+    f = figure(figures(figure_idx-1));
+    f.Position = [1435 712 732 617];
     control_signals = [sim_out.u1(start_idx:end_idx) sim_out.u2(start_idx:end_idx) sim_out.u3(start_idx:end_idx)];
-    plot_control_signals(sim_out.sim_time_sampled(start_idx:end_idx), control_signals, ['N = ' num2str(N)], plot_line_styles(i), 1.5*line_thickness)
+    plot_control_signals(sim_out.sim_time_sampled(start_idx:end_idx), control_signals, ['N = ' num2str(N)], clipped_plot_line_styles(i), 1.5*line_thickness)
     for m=1:3
         subplot(3,1,m)
         xlim([clipped_trajectory_start_time clipped_trajectory_end_time])
+        legend(Location="northwest")
     end
     hold on
     %==============================================================================
