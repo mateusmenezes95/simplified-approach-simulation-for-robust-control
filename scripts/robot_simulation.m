@@ -44,9 +44,9 @@ else
     simulink_model = "robot_2021a.slx";
 end
 
-print_section_description(strcat("Using ", simulink_model, "simulink file"));
+print_section_description(strcat("Using ", simulink_model, " simulink file"));
 
-for i=1:length(Nmax_vec)
+for i=1:length(N_vec)
     %==============================================================================
     % MPC Initialization
     %==============================================================================
