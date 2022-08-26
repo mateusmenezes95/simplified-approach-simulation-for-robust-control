@@ -8,15 +8,26 @@ function [Nmax, CNorm] = kao_criteria(Apred, Bpred, Cpred, q, r, Np, Nu, model)
     
     z = tf('z', model.ts);
     
-    P_z = tf(model); % Only valid for C = eye(3)
-    
-    C_z = Kmpc * [eye(3) ; (z/(z-1))*model.C];
-    
-    C_sens = feedback(series(C_z, P_z), eye(state_size), -1);
-    
-    Kao_sys = ((z-1)/z)*C_sens;
+    A = model.A;
+    B = model.B;
+    C = model.C;
+    D = model.D;
+  
+    C_z = Kmpc*[eye(state_size);(z/(z-1))*C];
+    Cz_ss = ss(C_z);
 
-    CNorm = norm(Kao_sys, Inf);
+    Ac = Cz_ss.A;
+    Bc = Cz_ss.B;
+    Cc = Cz_ss.C;
+    Dc = Cz_ss.D;
+
+    Aaug = [A-(B*Dc*C) B*Cc; -Bc*C Ac];
+    Baug = [B;zeros(state_size)];
+    Caug = [-Dc*C Cc];
+    
+    complementary_sensitivity = ss(Aaug, Baug, Caug, 0, model.ts);
+    CNorm = norm(complementary_sensitivity*((z-1)/z), Inf);
+
     Nmax = 0;
     if CNorm < 1
         Nmax = floor(1/CNorm);

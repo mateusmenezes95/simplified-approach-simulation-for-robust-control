@@ -17,7 +17,7 @@ q = 1:10:1001;
 Nmax_vector = zeros(size(q));
 Cnorm_vector = zeros(size(q));
 
-r=1;
+r=10000;
 
 loop_index= 1;
 for q_sample = q
@@ -29,7 +29,7 @@ for q_sample = q
 end
 
 figure(1)
-stem(q, Nmax_vector)
+stem(q, Nmax_vector, "Marker",".")
 grid on
 xlabel('q')
 ylabel('N_{max}')
@@ -42,9 +42,10 @@ else
 end
 
 figure(2)
-plot(q, Cnorm_vector)
+stem(q, Cnorm_vector, "Marker",".")
 grid on
 xlabel('q')
 ylabel('Norm_\infty')
+xlim([min(q) max(q)])
 
 print_section_description("Script for Kao criteria finished...")
