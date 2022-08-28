@@ -13,7 +13,7 @@ print_section_description("Running script for Kao criteria...")
 [A_pred, B_pred, C_pred] = ... 
     preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
 
-q = 1:10:1001;
+q = 1:9:1000;
 Nmax_vector = zeros(size(q));
 Cnorm_vector = zeros(size(q));
 
@@ -33,12 +33,14 @@ stem(q, Nmax_vector, "Marker",".")
 grid on
 xlabel('q')
 ylabel('N_{max}')
-xlim([min(q) max(q)])
+xlim([q(2) max(q)])
+yticks(0:1:Nmax_vector(2))
+xticks(q(2):90:max(q))
 if max(Nmax_vector) == 0
     ylim([0 1])
     yticks([0 1])
 else
-    ylim([0 max(Nmax_vector)])
+    ylim([0 Nmax_vector(2)])
 end
 
 figure(2)
@@ -46,6 +48,7 @@ stem(q, Cnorm_vector, "Marker",".")
 grid on
 xlabel('q')
 ylabel('Norm_\infty')
-xlim([min(q) max(q)])
+xlim([q(2) max(q)])
+xticks(q(2):90:max(q))
 
 print_section_description("Script for Kao criteria finished...")

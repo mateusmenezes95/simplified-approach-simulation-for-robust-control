@@ -185,7 +185,7 @@ for i=1:length(N_vec)
         % hold on
     end
     plot_robot_trajectory(sim_out.x(start_idx:end_idx), sim_out.y(start_idx:end_idx), ['N = ' num2str(N)], clipped_plot_line_styles(i), line_thickness)
-    legend(Location="southeast")
+    legend({}, Location="southeast", FontSize=12)
     hold on
     %==============================================================================
 
