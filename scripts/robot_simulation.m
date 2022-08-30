@@ -11,7 +11,7 @@ x_trajectory = square_trajectory(1,:);
 y_trajectory = square_trajectory(2,:);
 waypoints_qty = length(square_trajectory);
 
-sim_time = 90;  % Choosen due results inpection
+sim_time = 100;  % Choosen due results inpection
 
 %==============================================================================
 % Plot Parameters
@@ -63,7 +63,7 @@ for i=1:length(N_vec)
     %==============================================================================
 
     print_section_description(['Running Robot Simulation on Simulink with parameters: ' loop_step_params_str])
-    sim_out = sim(strcat("../simulink/", simulink_model));
+    sim_out = sim(strcat("./simulink/", simulink_model));
     print_section_description("Robot Simulation Finished!")
     %==============================================================================
 
@@ -71,7 +71,7 @@ for i=1:length(N_vec)
     % Plot trajectories
     %==============================================================================
     figure('Name', ['Trajectory | params: ' loop_step_params_str])
-    plot_robot_trajectory(x_trajectory, y_trajectory, 'referencia', '--k', line_thickness)
+    plot_robot_trajectory(x_trajectory, y_trajectory, 'Referência', '--k', line_thickness)
     xlim(trajectory_limits);
     ylim(trajectory_limits);
     hold on
@@ -154,7 +154,7 @@ for i=1:length(N_vec)
     %==============================================================================
 
     print_section_description(['Running Robot Simulation on Simulink to N = ' num2str(N)])
-    sim_out = sim('../simulink/robot.slx');
+    sim_out = sim('./simulink/robot.slx');
     print_section_description("Robot Simulation Finished!")
     %==============================================================================
 
@@ -163,7 +163,7 @@ for i=1:length(N_vec)
     %==============================================================================
     [figures, figure_idx] = select_figure(figures, ['Trajectory | params: ' loop_step_params_str], i, figure_idx);
     if i == 1
-        plot_robot_trajectory(x_trajectory, y_trajectory, 'referencia', '--k', line_thickness)
+        plot_robot_trajectory(x_trajectory, y_trajectory, 'Referência', '--k', line_thickness)
         xlim(trajectory_limits);
         ylim(trajectory_limits);
         hold on
