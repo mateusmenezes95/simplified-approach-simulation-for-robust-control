@@ -11,7 +11,7 @@ x_trajectory = square_trajectory(1,:);
 y_trajectory = square_trajectory(2,:);
 waypoints_qty = length(square_trajectory);
 
-sim_time = 100;  % Choosen due results inpection
+sim_time = 90;  % Choosen due results inpection
 
 %==============================================================================
 % Plot Parameters
@@ -128,7 +128,7 @@ end
 % ---- When the criteria is violated: N = 3
 
 r = 10000;
-q = 501;
+q = 500;
 N_vec = [0 2 3];
 
 loop_step_params_str = ['q = ' num2str(q) ', r = ' num2str(r) ' and N = ' num2str(N_vec)];
