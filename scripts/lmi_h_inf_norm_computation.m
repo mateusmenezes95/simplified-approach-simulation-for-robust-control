@@ -6,73 +6,115 @@ addpath(genpath("../lib/mpc_functions"))
 
 run simulation_parameters
 
+% =============================================================================
+% Nominal model parameters
+% =============================================================================
+
 nominal_mass = 1.551;
 nominal_inertia = 0.0062;
 
-[Aaug, Baug, Caug, Ad, Bd, Cd] = get_model_augmented_matrices(nominal_mass, nominal_inertia, sampling_period);
+% =============================================================================
+% Model parameters Uncertainties
+% =============================================================================
 
-r = 1;
-q = 100;
+uncertainty_delta = 0.2;
 
-[Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
-[Kw, Kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, q, r, prediction_horizon, control_horizon);
+uncertainty_lower_bound = (1 - uncertainty_delta);
+uncertainty_upper_bound = (1 + uncertainty_delta);
 
-Kmpc = Kmpc(1:size(Bd, 2), :); % Receding horizon control
+uncertainty_mass_vector = [nominal_mass*uncertainty_lower_bound, nominal_mass*uncertainty_upper_bound];
+uncertainty_inertia_vector = [nominal_inertia*uncertainty_lower_bound, nominal_inertia*uncertainty_upper_bound];
 
-no=size(Cd,1);
-ni=size(Bd,2);
-ns=size(Ad,2);
+% =============================================================================
+% State-space variables size
+% =============================================================================
 
-Almi = Aaug-Baug*Kmpc;
-Blmi = Baug;
-Clmi = -Kmpc;
-Dlmi = zeros(3);
+amount_of_outputs = 3;
+amount_of_inputs = 3;
+amount_of_states = 3;
 
-% Calcula norma inf (LMI)
-n=size(Almi,1); % dimensão do sistema aumentado
+% =============================================================================
+% Solver options
+% =============================================================================
 
-% Define variáveis para LMI ( comandos definidos pelo Yalmip )
-Pd=sdpvar(n);
-Gd=sdpvar(n,n,'full');
-mu=sdpvar(1);
-
-%Define a lista de LMIs
-ineqs=[];
-
-ineqs=[ineqs,[Pd Almi*Gd Blmi zeros(n,ni);...
-           Gd'*Almi' Gd+Gd'-Pd zeros(n,ni) Gd'*Clmi'; ...
-            Blmi' zeros(ni,n) eye(ni) Dlmi';...
-             zeros(ni,n) Clmi*Gd Dlmi eye(ni)*mu]>=0];
-
-% Define objetivo para otimização 
-objective = mu;
-
-% Exectua as LMIs
 opts = sdpsettings;
-opts.savesolveroutput =1 ;
+opts.savesolveroutput = 1;
+opts.verbose = 0;
 opts.solver = 'sdpt3';
 
-yalmipdiagnostics = solvesdp(ineqs,objective,opts);
+% =============================================================================
+% MPC tunning
+% =============================================================================
 
-% Recupera as variáveis
-mu = double(mu);
+q = 1:9:1000;
+r = 10000;
 
-fprintf('--------------')
-fprintf('Norma via função de transferência - alternativa')
-sys1=ss(Almi,Blmi,Clmi,Dlmi,-1);
-norm(sys1,inf)
+Nmax_vector = zeros(size(q));
+h_infnty_norm_vector = zeros(size(q));
 
-fprintf('Norma via LMI - Lema 2 / Teorema 4')
-sqrt(mu)
+loop_index= 1;
+for q_sample = q
+    fprintf('Computing H infinity norm for q = %d. Progress %.2f\n%', q_sample, (loop_index/size(q,2))*100);
+    norms_by_matlab = [];
+    ineqs=[];
+    for i = 1:size(uncertainty_mass_vector, 2)
+      for j = 1:size(uncertainty_inertia_vector, 2)
+        % Augmented state-space due the integrator addition
+        [Aaug, Baug, Caug] = get_model_augmented_matrices(uncertainty_mass_vector(i), ...
+                                uncertainty_inertia_vector(j), sampling_period);
 
-function [Aaug, Baug, Caug, Ad, Bd, Cd] = get_model_augmented_matrices(mass, inertia, sampling_period)
+        % Matrices to estimate the future states and control signals
+        [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
+        [Kw, Kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, q_sample, r, prediction_horizon, control_horizon);
+        Kmpc = Kmpc(1:amount_of_inputs, :); % Receding horizon control
+
+        Almi = Aaug-Baug*Kmpc;
+        Blmi = Baug;
+        Clmi = -Kmpc;
+        Dlmi = zeros(3);
+
+        n = size(Almi,1); % dimensão do sistema aumentado
+        Pd = sdpvar(n);
+        Gd = sdpvar(n, n, 'full');
+        mu = sdpvar(1);
+
+        ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs);...
+                        Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
+                        Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi';...
+                        zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
+
+        % sys1=ss(Almi,Blmi,Clmi,Dlmi,-1);
+        % norms_by_matlab = [norms_by_matlab, norm(sys1,2)];
+      end
+    end
+
+    objective = mu;
+    yalmipdiagnostics = optimize(ineqs, objective, opts);
+    mu = value(objective);
+    fprintf("Yalmip info for q=%d, r=%d: %s\n", q_sample, r, yalmipdiagnostics.info)
+
+    h_infnty_norm = sqrt(mu);
+    h_infnty_norm_vector(loop_index) = h_infnty_norm;
+
+    Nmax = floor(1/h_infnty_norm);
+    Nmax_vector(loop_index) = Nmax;
+
+    loop_index = loop_index + 1;
+end
+
+stem(q, h_infnty_norm_vector, "Marker",".")
+grid on
+xlabel('q')
+ylabel('Norm_\infty')
+xlim([q(2) max(q)])
+xticks(q(2):90:max(q))
+
+function [Aaug, Baug, Caug] = get_model_augmented_matrices(mass, inertia, sampling_period)
   Bv = 0.7;      % viscous friction relative to v (N/m/s)
   Bvn = 0.7;     % viscous friction relative to v n (N/m/s)
   Bw = 0.011;   % viscous friction relative to ω (N/rad/s)
 
-  %M = 1.551;   % robots mass (kg)
   M = mass;
-  %J = 0.0062;  % robots inertial momentum (kg.m 2 )
   J = inertia;  % robots inertial momentum (kg.m 2 )
 
   L = 0.1;     % robots radius (m)
@@ -131,6 +173,4 @@ function [Aaug, Baug, Caug, Ad, Bd, Cd] = get_model_augmented_matrices(mass, ine
   ];
 
   Caug = [zeros(state_vector_size) eye(state_vector_size)];
-
-  print_section_description("State Space Model Loaded")
 end
