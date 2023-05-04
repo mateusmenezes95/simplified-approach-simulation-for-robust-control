@@ -11,21 +11,21 @@ run simulation_parameters
 % =============================================================================
 
 nominal_mass = 1.551;
-nominal_inertia = 0.0062;
+nominal_friction = 0.7;
 
 % =============================================================================
 % Model parameters Uncertainties
 % =============================================================================
 
-uncertainty_delta = 0.2;
+uncertainty_delta = 0.5;
 
 uncertainty_lower_bound = (1 - uncertainty_delta);
 uncertainty_upper_bound = (1 + uncertainty_delta);
 
 uncertainty_mass_vector = [nominal_mass*uncertainty_lower_bound, ... 
                            nominal_mass*uncertainty_upper_bound];
-uncertainty_inertia_vector = [nominal_inertia*uncertainty_lower_bound, ...
-                              nominal_inertia*uncertainty_upper_bound];
+uncertainty_friction_vector = [nominal_friction*uncertainty_lower_bound, ...
+                              nominal_friction*uncertainty_upper_bound];
 
 % =============================================================================
 % State-space variables size
@@ -59,11 +59,15 @@ for q_sample = q
     fprintf('Computing H infinity norm for q = %d. Progress %.2f\n%', q_sample, (loop_index/size(q,2))*100);
     % norms_by_matlab = [];
     ineqs=[];
+    Gd = [];
+    Gd = sdpvar(9, 9, 'full');
+    mu = 0;
+    mu = sdpvar(1);
     for i = 1:size(uncertainty_mass_vector, 2)
-      for j = 1:size(uncertainty_inertia_vector, 2)
+      for j = 1:size(uncertainty_friction_vector, 2)
         % Augmented state-space due the integrator addition
         [Aaug, Baug, Caug, A, B, C, D] = get_model_matrices(uncertainty_mass_vector(i), ...
-                                uncertainty_inertia_vector(j), sampling_period);
+                                uncertainty_friction_vector(j), sampling_period);
 
         % Matrices to estimate the future states and control signals
         [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
@@ -86,8 +90,6 @@ for q_sample = q
 
         n = size(Almi,1); % dimensão do sistema aumentado
         Pd = sdpvar(n);
-        Gd = sdpvar(n, n, 'full');
-        mu = sdpvar(1);
 
         ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs);...
                         Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
@@ -98,7 +100,7 @@ for q_sample = q
         % norms_by_matlab = [norms_by_matlab, norm(sys1,2)];
       end
     end
-
+  
     objective = mu;
     yalmipdiagnostics = optimize(ineqs, objective, opts);
     mu = value(objective);
@@ -122,13 +124,13 @@ grid on
 xlabel('q')
 ylabel('N_{max}')
 xlim([q(2) max(q)])
-yticks(0:1:Nmax_vector(2))
+yticks(0:1:max(Nmax_vector(2:end)))
 xticks(q(2):90:max(q))
 if max(Nmax_vector) == 0
     ylim([0 1])
     yticks([0 1])
 else
-    ylim([0 Nmax_vector(2)])
+    ylim([0 max(Nmax_vector(2:end))])
 end
 
 figure(2)
@@ -139,13 +141,13 @@ ylabel('Norm_\infty')
 xlim([q(2) max(q)])
 xticks(q(2):90:max(q))
 
-function [Aaug, Baug, Caug, Ad, Bd, Cd, Dd] = get_model_matrices(mass, inertia, sampling_period)
-  Bv = 0.7;      % viscous friction relative to v (N/m/s)
+function [Aaug, Baug, Caug, Ad, Bd, Cd, Dd] = get_model_matrices(mass, viscous_friction, sampling_period)
+  Bv = viscous_friction;  % viscous friction relative to v (N/m/s)
   Bvn = 0.7;     % viscous friction relative to v n (N/m/s)
   Bw = 0.011;   % viscous friction relative to ω (N/rad/s)
 
   M = mass;
-  J = inertia;  % robots inertial momentum (kg.m 2 )
+  J = 0.0062;  % robots inertial momentum (kg.m 2 )
 
   L = 0.1;     % robots radius (m)
   wr = 0.0505;  % wheels radius (m)
