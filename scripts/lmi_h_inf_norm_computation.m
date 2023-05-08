@@ -49,8 +49,10 @@ opts.solver = 'sdpt3';
 q = 1:9:1000;
 r = 10000;
 
-Nmax_vector = zeros(size(q));
+Nmax_with_uncertainty_vector = zeros(size(q));
+Nmax_without_uncertainty_vector = zeros(size(q));
 h_infnty_norm_vector = zeros(size(q));
+norms_without_uncertainty = zeros(size(q));
 
 waitbar_fig = waitbar(0, 'Starting LMI computation...');
 
@@ -58,7 +60,6 @@ loop_index= 1;
 for q_sample = q
     waitbar((loop_index/size(q,2)), waitbar_fig, ...
             sprintf('Computing H infinity norm for q = %d', q_sample));
-    % norms_by_matlab = [];
     ineqs=[];
     Gd = [];
     Gd = sdpvar(9, 9, 'full');
@@ -66,39 +67,19 @@ for q_sample = q
     mu = sdpvar(1);
     for i = 1:size(uncertainty_mass_vector, 2)
       for j = 1:size(uncertainty_friction_vector, 2)
-        % Augmented state-space due the integrator addition
-        [Aaug, Baug, Caug, A, B, C, D] = get_model_matrices(uncertainty_mass_vector(i), ...
-                                uncertainty_friction_vector(j), sampling_period);
-
-        % Matrices to estimate the future states and control signals
-        [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
-        [Kw, Kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, q_sample, r, prediction_horizon, control_horizon);
-        Kmpc = Kmpc(1:amount_of_inputs, :); % Receding horizon control
-
-        z = tf('z', sampling_period);
-        C_z = -Kmpc*[eye(amount_of_states);(z/(z-1))*C];
-        Cz_ss = ss(C_z);
-
-        Ac = Cz_ss.A;
-        Bc = Cz_ss.B;
-        Cc = Cz_ss.C;
-        Dc = Cz_ss.D;
-
-        Almi = [A+B*Dc*C B*Cc zeros(3); Bc*C Ac zeros(3); Dc*C Cc zeros(3)];
-        Blmi = [B; zeros(3); zeros(3)];
-        Clmi = [Dc Cc -eye(3)];
-        Dlmi = zeros(3);
+        [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(uncertainty_mass_vector(i), ... 
+                                                    uncertainty_friction_vector(j), ...
+                                                    sampling_period, prediction_horizon, ...
+                                                    control_horizon, ...
+                                                    r, q_sample);
 
         n = size(Almi,1); % dimensão do sistema aumentado
         Pd = sdpvar(n);
 
-        ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs);...
+        ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs); ...
                         Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
-                        Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi';...
+                        Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
                         zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
-
-        % sys1=ss(Almi,Blmi,Clmi,Dlmi,-1);
-        % norms_by_matlab = [norms_by_matlab, norm(sys1,2)];
       end
     end
   
@@ -110,11 +91,15 @@ for q_sample = q
     h_infnty_norm = sqrt(mu);
     h_infnty_norm_vector(loop_index) = h_infnty_norm;
 
-    Nmax = 0;
-    if h_infnty_norm < 1
-      Nmax = floor(1/h_infnty_norm);
-    end
-    Nmax_vector(loop_index) = Nmax;
+    % Norm computation for the closed-loop system without uncertainty
+    [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(nominal_mass, nominal_friction, sampling_period, ...
+                                                prediction_horizon, control_horizon, r, q_sample);
+    closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
+    norm_without_uncertainty = norm(closed_loop_ss, inf);
+    norms_without_uncertainty(loop_index) = norm_without_uncertainty;
+
+    Nmax_with_uncertainty_vector(loop_index) = get_maximum_delay(h_infnty_norm);
+    Nmax_without_uncertainty_vector(loop_index) = get_maximum_delay(norm_without_uncertainty);
 
     loop_index = loop_index + 1;
 end
@@ -122,25 +107,42 @@ end
 close(waitbar_fig)
 
 figure(1)
-stem(q, Nmax_vector, "Marker",".")
+stem(q, Nmax_without_uncertainty_vector, "Marker", "x", "Color", "r")
+hold on
+stem(q, Nmax_with_uncertainty_vector, "Marker", ".", "Color", "b")
+legend("without uncertainty", "with uncertainty");
 grid on
 xlabel('q')
 ylabel('N_{max}')
 xlim([q(2) max(q)])
-yticks(0:1:max(Nmax_vector(2:end)))
+maximum_nmax = max([Nmax_with_uncertainty_vector(2:end); Nmax_without_uncertainty_vector(2:end)], [], 'all'); 
+yticks(0:1:maximum_nmax)
 xticks(q(2):90:max(q))
-if max(Nmax_vector) == 0
+if max(Nmax_with_uncertainty_vector) == 0
     ylim([0 1])
     yticks([0 1])
 else
-    ylim([0 max(Nmax_vector(2:end))])
+    ylim([0 maximum_nmax])
 end
 
 figure(2)
-stem(q, h_infnty_norm_vector, "Marker",".")
+subplot(2,1,1)
+stem(q, h_infnty_norm_vector, "Marker", ".", "Color", "b")
+hold on
+stem(q, norms_without_uncertainty, "Marker", "x", "Color", "r")
+legend("with uncertainty", "without uncertainty", "Location", "northwest");
 grid on
 xlabel('q')
 ylabel('Norm_\infty')
+xlim([q(2) max(q)])
+xticks(q(2):90:max(q))
+
+subplot(2,1,2)
+title("Norm by LMI - Norm by Matlab norm function")
+stem(q, h_infnty_norm_vector- norms_without_uncertainty, "Marker", ".")
+grid on
+xlabel('q')
+ylabel('Norm_\infty differences')
 xlim([q(2) max(q)])
 xticks(q(2):90:max(q))
 
@@ -209,4 +211,38 @@ function [Aaug, Baug, Caug, Ad, Bd, Cd, Dd] = get_model_matrices(mass, viscous_f
   ];
 
   Caug = [zeros(state_vector_size) eye(state_vector_size)];
+end
+
+function [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(mass, friction, dt, np, nu, r_weight, q_weight) 
+  % Augmented state-space due the integrator addition
+  [Aaug, Baug, Caug, A, B, C, D] = get_model_matrices(mass, friction, dt);
+
+  amount_of_states = size(A, 2);
+  amount_of_inputs = size(B, 2);
+
+  % Matrices to estimate the future states and control signals
+  [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, np, nu);
+  [Kw, Kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, q_weight, r_weight, np, nu);
+  Kmpc = Kmpc(1:amount_of_inputs, :); % Receding horizon control
+
+  z = tf('z', dt);
+  C_z = -Kmpc*[eye(amount_of_states);(z/(z-1))*C];
+  Cz_ss = ss(C_z);
+
+  Ac = Cz_ss.A;
+  Bc = Cz_ss.B;
+  Cc = Cz_ss.C;
+  Dc = Cz_ss.D;
+
+  Almi = [A+B*Dc*C B*Cc zeros(3); Bc*C Ac zeros(3); Dc*C Cc zeros(3)];
+  Blmi = [B; zeros(3); zeros(3)];
+  Clmi = [Dc Cc -eye(3)];
+  Dlmi = zeros(3);
+end
+
+function max_delay = get_maximum_delay(norm)
+  max_delay = 0;
+  if norm < 1
+    max_delay = floor(1/norm);
+  end
 end
