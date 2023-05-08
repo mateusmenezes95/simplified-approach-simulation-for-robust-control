@@ -17,15 +17,13 @@ nominal_friction = 0.7;
 % Model parameters Uncertainties
 % =============================================================================
 
-uncertainty_delta = 0.5;
+uncertainty_mass_delta = 0.2;
+uncertainty_friction_delta = 0.4;
 
-uncertainty_lower_bound = (1 - uncertainty_delta);
-uncertainty_upper_bound = (1 + uncertainty_delta);
-
-uncertainty_mass_vector = [nominal_mass*uncertainty_lower_bound, ... 
-                           nominal_mass*uncertainty_upper_bound];
-uncertainty_friction_vector = [nominal_friction*uncertainty_lower_bound, ...
-                              nominal_friction*uncertainty_upper_bound];
+uncertainty_mass_vector = [nominal_mass*(1-uncertainty_mass_delta), ... 
+                           nominal_mass*(1+uncertainty_mass_delta)];
+uncertainty_friction_vector = [nominal_friction*(1-uncertainty_friction_delta), ...
+                              nominal_friction*(1+uncertainty_friction_delta)];
 
 % =============================================================================
 % State-space variables size
