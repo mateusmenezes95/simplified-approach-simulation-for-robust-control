@@ -54,9 +54,12 @@ r = 10000;
 Nmax_vector = zeros(size(q));
 h_infnty_norm_vector = zeros(size(q));
 
+waitbar_fig = waitbar(0, 'Starting LMI computation...');
+
 loop_index= 1;
 for q_sample = q
-    fprintf('Computing H infinity norm for q = %d. Progress %.2f\n%', q_sample, (loop_index/size(q,2))*100);
+    waitbar((loop_index/size(q,2)), waitbar_fig, ...
+            sprintf('Computing H infinity norm for q = %d', q_sample));
     % norms_by_matlab = [];
     ineqs=[];
     Gd = [];
@@ -117,6 +120,8 @@ for q_sample = q
 
     loop_index = loop_index + 1;
 end
+
+close(waitbar_fig)
 
 figure(1)
 stem(q, Nmax_vector, "Marker",".")
