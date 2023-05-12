@@ -51,7 +51,7 @@ r = 10000;
 
 Nmax_with_uncertainty_vector = zeros(size(q));
 Nmax_without_uncertainty_vector = zeros(size(q));
-h_infnty_norm_vector = zeros(size(q));
+norms_with_uncertainty = zeros(size(q));
 norms_without_uncertainty = zeros(size(q));
 
 waitbar_fig = waitbar(0, 'Starting LMI computation...');
@@ -88,8 +88,8 @@ for q_sample = q
     mu = value(objective);
     fprintf("Yalmip info for q=%d, r=%d: %s\n", q_sample, r, yalmipdiagnostics.info)
 
-    h_infnty_norm = sqrt(mu);
-    h_infnty_norm_vector(loop_index) = h_infnty_norm;
+    norm_with_uncertainty = sqrt(mu);
+    norms_with_uncertainty(loop_index) = norm_with_uncertainty;
 
     % Norm computation for the closed-loop system without uncertainty
     [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(nominal_mass, nominal_friction, sampling_period, ...
@@ -98,7 +98,7 @@ for q_sample = q
     norm_without_uncertainty = norm(closed_loop_ss, inf);
     norms_without_uncertainty(loop_index) = norm_without_uncertainty;
 
-    Nmax_with_uncertainty_vector(loop_index) = get_maximum_delay(h_infnty_norm);
+    Nmax_with_uncertainty_vector(loop_index) = get_maximum_delay(norm_with_uncertainty);
     Nmax_without_uncertainty_vector(loop_index) = get_maximum_delay(norm_without_uncertainty);
 
     loop_index = loop_index + 1;
@@ -127,7 +127,7 @@ end
 
 figure(2)
 subplot(2,1,1)
-stem(q, h_infnty_norm_vector, "Marker", ".", "Color", "b")
+stem(q, norms_with_uncertainty, "Marker", ".", "Color", "b")
 hold on
 stem(q, norms_without_uncertainty, "Marker", "x", "Color", "r")
 legend("with uncertainty", "without uncertainty", "Location", "northwest");
@@ -139,7 +139,7 @@ xticks(q(2):90:max(q))
 
 subplot(2,1,2)
 title("Norm by LMI - Norm by Matlab norm function")
-stem(q, h_infnty_norm_vector- norms_without_uncertainty, "Marker", ".")
+stem(q, norms_with_uncertainty- norms_without_uncertainty, "Marker", ".")
 grid on
 xlabel('q')
 ylabel('Norm_\infty differences')
