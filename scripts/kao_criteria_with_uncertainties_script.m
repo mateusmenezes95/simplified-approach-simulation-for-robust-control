@@ -53,11 +53,16 @@ opts.solver = 'sdpt3';
 q = 1:9:1000;
 r = 10000;
 
-Nmax_with_uncertainty_vector = zeros(size(q));
-Nmax_without_uncertainty_vector = zeros(size(q));
-norms_with_uncertainty = zeros(size(q));
-norms_without_uncertainty = zeros(size(q));
-vertex_norms = [zeros(size(q)); zeros(size(q))]';
+lmi_norm_with_uncertainty_vec = zeros(size(q));
+lmi_nmax_with_uncertainty_vec = zeros(size(q));
+
+lmi_norm_without_uncertainty_vec = zeros(size(q));
+lmi_nmax_without_uncertainty_vec = zeros(size(q));
+
+matlab_norm_without_uncertainty_vec = zeros(size(q));
+matlab_nmax_without_uncertainty_vec = zeros(size(q));
+
+matlab_vertex_norm_vec = [zeros(size(q)); zeros(size(q))]';
 
 waitbar_fig = waitbar(0, 'Starting LMI computation...');
 
@@ -72,8 +77,8 @@ for q_sample = q
     mu = sdpvar(1);
     for i = 1:size(uncertainty_mass_vector, 2)
       % for j = 1:size(uncertainty_friction_vector, 2)
-        [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(nominal_mass, ... 
-                                                    uncertainty_friction_vector(i), ...
+        [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(uncertainty_mass_vector(i), ... 
+                                                    nominal_friction, ...
                                                     sampling_period, prediction_horizon, ...
                                                     control_horizon, ...
                                                     r, q_sample);
@@ -86,54 +91,114 @@ for q_sample = q
                         Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
                         zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
 
-      % Norm computation for the closed-loop system without uncertainty
+      % Norm computation of the vertex for the closed-loop system
       closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
       vertex_norm = norm(closed_loop_ss, inf);
-      vertex_norms(loop_index, i) = vertex_norm;
-      % end
-    end
+      matlab_vertex_norm_vec(loop_index, i) = vertex_norm;
+    % end
+  end
   
     objective = mu;
     yalmipdiagnostics = optimize(ineqs, objective, opts);
     mu = value(objective);
     fprintf("Yalmip info for q=%d, r=%d: %s\n", q_sample, r, yalmipdiagnostics.info)
 
-    norm_with_uncertainty = sqrt(mu);
-    norms_with_uncertainty(loop_index) = norm_with_uncertainty;
+    lmi_norm_with_uncertainty = sqrt(mu);
+    lmi_norm_with_uncertainty_vec(loop_index) = lmi_norm_with_uncertainty;
 
     % Norm computation for the closed-loop system without uncertainty
     [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(nominal_mass, nominal_friction, sampling_period, ...
                                                 prediction_horizon, control_horizon, r, q_sample);
-    closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
-    norm_without_uncertainty = norm(closed_loop_ss, inf);
-    norms_without_uncertainty(loop_index) = norm_without_uncertainty;
+    Pd = [];
+    Pd = sdpvar(n);
+    Gd = [];
+    Gd = sdpvar(n, n, 'full');
+    mu = 0;
+    mu = sdpvar(1);
+    ineqs=[];
+    ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs); ...
+                    Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
+                    Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
+                    zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
 
-    Nmax_with_uncertainty_vector(loop_index) = get_maximum_delay(norm_with_uncertainty);
-    Nmax_without_uncertainty_vector(loop_index) = get_maximum_delay(norm_without_uncertainty);
+    objective = mu;
+    yalmipdiagnostics = optimize(ineqs, objective, opts);
+    mu = value(objective);
+
+    lmi_norm_without_uncertainty = sqrt(mu);
+    lmi_norm_without_uncertainty_vec(loop_index) = lmi_norm_without_uncertainty;
+
+    closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
+    matlab_norm_without_uncertainty = norm(closed_loop_ss, inf);
+    matlab_norm_without_uncertainty_vec(loop_index) = matlab_norm_without_uncertainty;
+
+    lmi_nmax_with_uncertainty_vec(loop_index) = get_maximum_delay(lmi_norm_with_uncertainty);
+    matlab_nmax_without_uncertainty_vec(loop_index) = get_maximum_delay(matlab_norm_without_uncertainty);
 
     loop_index = loop_index + 1;
 end
 
 close(waitbar_fig)
 
-figure(1)
-plot_overlapping_nmax(q, 90, Nmax_without_uncertainty_vector, Nmax_with_uncertainty_vector, ...
-                      {'without uncertainty', 'with uncertainty'})
+% =============================================================================
+figure("Name", "Vertex Norms")
+% =============================================================================
 
-figure(2)
-subplot(2,1,1)
-legends = {'with uncertainties', 'without uncertainties'};
-plot_overlapping_norms(q, 90, norms_with_uncertainty, norms_without_uncertainty, legends)
+subplot(2,2,1)
+plot_norms(q, 90, matlab_vertex_norm_vec(:,1), "Vertex 1", "||H||_\infty")
 
-subplot(2,1,2)
-plot_norms(q, 90, norms_with_uncertainty- norms_without_uncertainty, ...
-           "Norm by LMI - Norm by Matlab norm function", "H_\infty differences")
+subplot(2,2,2)
+plot_norms(q, 90, matlab_vertex_norm_vec(:,2), "Vertex 2", "||H||_\infty")
 
-figure(3)
-legends = {'vertex 1', 'vertex 2'};
-plot_overlapping_norms(q, 90, vertex_norms(:,1), vertex_norms(:,2), legends)
+subplot(2,2,3)
+plot_norms(q, 90, matlab_vertex_norm_vec(:,1)- matlab_vertex_norm_vec(:,2), ...
+           "Vertex 1 - Vertex 2", "||H||_\infty differences")
 
-function [Aaug, Baug, Caug, Ad, Bd, Cd, Dd] = get_model_matrices(mass, viscous_friction, sampling_period)
+subplot(2,2,4)
+max_vertex_norm = max(matlab_vertex_norm_vec, [], 2)';
+plot_norms(q, 90, max_vertex_norm, "Max norm of the two vertices", "||H||_\infty")
+
+% =============================================================================
+figure("Name", "Norms by LMI")
+% =============================================================================
+
+subplot(2,2,1)
+plot_norms(q, 90, lmi_norm_with_uncertainty_vec, ...
+           "||H||_\infty by LMI with uncertainty", "||H||_\infty")
+
+subplot(2,2,2)
+plot_norms(q, 90, lmi_norm_without_uncertainty_vec, ...
+           "||H||_\infty by LMI without uncertainty", "||H||_\infty")
+
+subplot(2,2,3)
+plot_norms(q, 90, lmi_norm_with_uncertainty_vec - lmi_norm_without_uncertainty_vec, ...
+           "||H||_\infty by LMI with uncertainty - ||H||_\infty by LMI without uncertainty", ...
+           "||H||_\infty")
+
+subplot(2,2,4)
+plot_norms(q, 90, lmi_norm_with_uncertainty_vec - max_vertex_norm, ...
+           "||H||_\infty by LMI with uncertainty - max ||H||_\infty by Matlab of the two vertices", ...
+           "||H||_\infty norm")
+
+% =============================================================================
+figure("Name", "Norms of Nominal Model by LMI and Matlab")
+% =============================================================================
+
+subplot(3,1,1)
+plot_norms(q, 90, matlab_norm_without_uncertainty_vec, ...
+           "||H||_\infty by Matlab for the nominal model", "||H||_\infty")
+
+subplot(3,1,2)
+plot_norms(q, 90, lmi_norm_without_uncertainty_vec, ...
+           "||H||_\infty by LMI for the nominal model", "||H||_\infty")
+
+subplot(3,1,3)
+plot_norms(q, 90, matlab_norm_without_uncertainty_vec - lmi_norm_without_uncertainty_vec, ...
+           "||H||_\infty by Matlab - ||H||_\infty by LMI for the nominal model", ...
+           "||H||_\infty")
+
+function [Aaug, Baug, Caug, ...
+          Ad, Bd, Cd, Dd] = get_model_matrices(mass, viscous_friction, sampling_period)
   Bv = viscous_friction;  % viscous friction relative to v (N/m/s)
   Bvn = 0.7;     % viscous friction relative to v n (N/m/s)
   Bw = 0.011;   % viscous friction relative to ω (N/rad/s)

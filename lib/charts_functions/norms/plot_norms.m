@@ -1,6 +1,6 @@
 function plot_norms(x_axis_ticks, x_axis_ticks_step, norms_vec, title_str, ylabel_str)
-    title(title_str)
     stem(x_axis_ticks, norms_vec, "Marker", ".")
+    title(title_str)
     grid on
     xlabel('q')
     ylabel(ylabel_str)
