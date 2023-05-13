@@ -1,6 +1,9 @@
 clc
 clear all
 
+current_script_path = fileparts(mfilename('fullpath'));
+cd(current_script_path)
+
 addpath(genpath("../lib")) 
 addpath(genpath("../lib/mpc_functions")) 
 
