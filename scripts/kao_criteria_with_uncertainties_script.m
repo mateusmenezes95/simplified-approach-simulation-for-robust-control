@@ -1,5 +1,5 @@
 clc
-clear all
+clear
 
 current_script_path = fileparts(mfilename('fullpath'));
 cd(current_script_path)
@@ -7,6 +7,7 @@ cd(current_script_path)
 addpath(genpath("../lib")) 
 addpath(genpath("../lib/mpc_functions"))
 addpath(genpath("../lib/chart_functions/norms"))
+addpath(genpath("../lib/dynamic_models"))
 
 run simulation_parameters
 
@@ -14,20 +15,48 @@ run simulation_parameters
 % Nominal model parameters
 % =============================================================================
 
-nominal_mass = 1.551;
-nominal_friction = 0.7;
+nominal_model.bv = 0.7;  % viscous friction relative to v (N/m/s)
+nominal_model.bvn = 0.7;     % viscous friction relative to v n (N/m/s)
+nominal_model.bw = 0.011;   % viscous friction relative to ω (N/rad/s)
+
+nominal_model.mass = 1.551;
+nominal_model.inertia = 0.0062;  % robots inertial momentum (kg.m 2 )
+
+nominal_model.robot_radius = 0.1;     % robots radius (m)
+nominal_model.wheel_radius = 0.0505;  % wheels radius (m)
+
+nominal_model.gear_reduction_rate = 19/1;    % motors gear’s reduction rate
+nominal_model.armature_resistance = 1.69;    % armature resistance (Ω)
+nominal_model.vel_constant = 0.0059;  % motor velocity constant (V olts/rad/s)
+nominal_model.torque_constant = 0.0059;  % torque constant (N.m/A)
+
+robot_param = nominal_model;
 
 % =============================================================================
 % Model parameters Uncertainties
 % =============================================================================
+     
+uncertainty_vec = zeros(2);
+uncertainty_option = 'robot_radius';
+delta = 0.3;
 
-uncertainty_mass_delta = 0.5;
-uncertainty_friction_delta = 0.4;
+switch uncertainty_option
+  case 'mass'
+    nominal_value = nominal_model.mass;
+  case 'friction'
+    nominal_value = nominal_model.bv;
+  case 'armature_resistance'
+    nominal_value = nominal_model.armature_resistance;
+  case 'robot_radius'
+    nominal_value = nominal_model.robot_radius;
+  case 'wheel_radius'
+    nominal_value = nominal_model.wheel_radius;
+  otherwise
+      disp('Unknown uncertainty option');
+      return
+end
 
-uncertainty_mass_vector = [nominal_mass*(1-uncertainty_mass_delta), ... 
-                           nominal_mass*(1+uncertainty_mass_delta)];
-uncertainty_friction_vector = [nominal_friction*(1-uncertainty_friction_delta), ...
-                              nominal_friction*(1+uncertainty_friction_delta)];
+uncertainty_vec = [nominal_value*(1 - delta), nominal_value*(1 + delta)];
 
 % =============================================================================
 % State-space variables size
@@ -75,10 +104,27 @@ for q_sample = q
     Gd = sdpvar(9, 9, 'full');
     mu = 0;
     mu = sdpvar(1);
-    for i = 1:size(uncertainty_mass_vector, 2)
-      % for j = 1:size(uncertainty_friction_vector, 2)
-        [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(uncertainty_mass_vector(i), ... 
-                                                    nominal_friction, ...
+    for i = 1:size(uncertainty_vec, 2)
+      % for j = 1:size(uncertainty_vec, 2)
+
+        switch uncertainty_option
+          case 'mass'
+            robot_param.mass = uncertainty_vec(i);
+          case 'friction'
+            robot_param.bv = uncertainty_vec(i);
+          case 'armature_resistance'
+            robot_param.armature_resistance = uncertainty_vec(i);
+          case 'robot_radius'
+            robot_param.robot_radius = uncertainty_vec(i);
+        end
+
+        % if j == 1
+        %   robot_param.armature_resistance = robot_param.armature_resistance*(1 - 0.2);
+        % else
+        %   robot_param.armature_resistance = robot_param.armature_resistance*(1 + 0.2);
+        % end
+
+        [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(robot_param, ... 
                                                     sampling_period, prediction_horizon, ...
                                                     control_horizon, ...
                                                     r, q_sample);
@@ -95,8 +141,8 @@ for q_sample = q
       closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
       vertex_norm = norm(closed_loop_ss, inf);
       matlab_vertex_norm_vec(loop_index, i) = vertex_norm;
-    % end
-  end
+      % end
+    end
   
     objective = mu;
     yalmipdiagnostics = optimize(ineqs, objective, opts);
@@ -107,7 +153,7 @@ for q_sample = q
     lmi_norm_with_uncertainty_vec(loop_index) = lmi_norm_with_uncertainty;
 
     % Norm computation for the closed-loop system without uncertainty
-    [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(nominal_mass, nominal_friction, sampling_period, ...
+    [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(nominal_model, sampling_period, ...
                                                 prediction_horizon, control_horizon, r, q_sample);
     Pd = [];
     Pd = sdpvar(n);
@@ -197,100 +243,23 @@ plot_norms(q, 90, matlab_norm_without_uncertainty_vec - lmi_norm_without_uncerta
            "||H||_\infty by Matlab - ||H||_\infty by LMI for the nominal model", ...
            "||H||_\infty")
 
-function [Aaug, Baug, Caug, ...
-          Ad, Bd, Cd, Dd] = get_model_matrices(mass, viscous_friction, sampling_period)
-  Bv = viscous_friction;  % viscous friction relative to v (N/m/s)
-  Bvn = 0.7;     % viscous friction relative to v n (N/m/s)
-  Bw = 0.011;   % viscous friction relative to ω (N/rad/s)
+% =============================================================================
+figure("Name", "Maximum delay allowed by LMI and Matlab")
+% =============================================================================
 
-  M = mass;
-  J = 0.0062;  % robots inertial momentum (kg.m 2 )
+subplot(3,1,1)
+plot_nmax(q, 90, matlab_nmax_without_uncertainty_vec, ...
+          "Maximum delay allowed by Matlab ||H||_\infty  for the nominal model")
 
-  L = 0.1;     % robots radius (m)
-  wr = 0.0505;  % wheels radius (m)
+subplot(3,1,2)
+plot_nmax(q, 90, lmi_nmax_with_uncertainty_vec, ...
+          "Maximum delay allowed by LMI ||H||_\infty  for the model with uncertainty")
 
-  nr = 19/1;    % motors gear’s reduction rate
-  Ra = 1.69;    % armature resistance (Ω)
-  Kv = 0.0059;  % motor velocity constant (V olts/rad/s)
-  Kt = 0.0059;  % torque constant (N.m/A)
-
-  % Plant dynamic continuous matrix
-  a11 = (-(3*(nr^2)*Kt*Kv)/(2*M*Ra*(wr^2)))-(Bv/M);
-  a22 = a11;
-  a33 = (-(3*(L^2)*(nr^2)*Kt*Kv)/(J*Ra*(wr^2)))-(Bw/J);
-
-  A = ...
-  [
-    a11  0    0;
-    0    a22  0;
-    0    0    a33;
-  ];
-
-  B = ...
-  [
-    0     sqrt(3)/(2*M)   -sqrt(3)/(2*M)
-    -1/M  1/(2*M)         1/(2*M)
-    L/J  L/J           L/J
-  ];
-  B = ((nr*Kt)/(Ra*wr))*B;
-
-  C = eye(3);
-
-  states = {'v', 'vn', 'w'};
-  state_vector_size = 3;
-
-  robot_continous_model = ss(A, B, C, 0, ...
-                            'StateName', states, 'OutputName', states, ...
-                            'Name', 'Robot Model');
-
-  robot_discrete_model = c2d(robot_continous_model, sampling_period);
-
-  Ad = robot_discrete_model.A;
-  Bd = robot_discrete_model.B;
-  Cd = robot_discrete_model.C;
-  Dd = robot_discrete_model.D;
-
-  Aaug = ...
-  [
-    Ad    zeros(size(Ad));
-    Cd*Ad eye(size(Cd,1),size(Ad,2))
-  ];
-
-  Baug = ...
-  [
-    Bd;
-    Cd*Bd
-  ];
-
-  Caug = [zeros(state_vector_size) eye(state_vector_size)];
-end
-
-function [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(mass, friction, dt, np, nu, r_weight, q_weight) 
-  % Augmented state-space due the integrator addition
-  [Aaug, Baug, Caug, A, B, C, D] = get_model_matrices(mass, friction, dt);
-
-  amount_of_states = size(A, 2);
-  amount_of_inputs = size(B, 2);
-
-  % Matrices to estimate the future states and control signals
-  [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, np, nu);
-  [Kw, Kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, q_weight, r_weight, np, nu);
-  Kmpc = Kmpc(1:amount_of_inputs, :); % Receding horizon control
-
-  z = tf('z', dt);
-  C_z = -Kmpc*[eye(amount_of_states);(z/(z-1))*C];
-  Cz_ss = ss(C_z);
-
-  Ac = Cz_ss.A;
-  Bc = Cz_ss.B;
-  Cc = Cz_ss.C;
-  Dc = Cz_ss.D;
-
-  Almi = [A+B*Dc*C B*Cc zeros(3); Bc*C Ac zeros(3); Dc*C Cc zeros(3)];
-  Blmi = [B; zeros(3); zeros(3)];
-  Clmi = [Dc Cc -eye(3)];
-  Dlmi = zeros(3);
-end
+subplot(3,1,3)
+plot_overlapping_nmax(q, 90, matlab_nmax_without_uncertainty_vec, ...
+                      lmi_nmax_with_uncertainty_vec, ...
+                      "Comparison between the maximum delay allowed by Matlab and LMI", ...
+                      {'Without uncertainty', 'With uncertainty'})
 
 function max_delay = get_maximum_delay(norm)
   max_delay = 0;
