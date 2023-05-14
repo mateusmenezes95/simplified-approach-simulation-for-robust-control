@@ -1,6 +1,7 @@
 function plot_overlapping_nmax(x_axis_ticks, x_axis_ticks_step, ...
-                               underlay_nmax, overlay_nmax, legends)
+                               underlay_nmax, overlay_nmax, title_str, legends)
     stem(x_axis_ticks, underlay_nmax, "Marker", "x", "Color", "r")
+    title(title_str)
     hold on
     stem(x_axis_ticks, overlay_nmax, "Marker", ".", "Color", "b")
     legend(legends{1}, legends{2});
