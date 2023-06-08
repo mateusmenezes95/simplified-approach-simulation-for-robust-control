@@ -36,27 +36,30 @@ robot_param = nominal_model;
 % Model parameters Uncertainties
 % =============================================================================
      
-uncertainty_vec = zeros(2);
-uncertainty_option = 'robot_radius';
-delta = 0.3;
+mass_delta = 0.01;
+inertia_delta = 0.10;
+robot_radius_delta = 0.05;
+armature_resistance_delta = 0.3;
 
-switch uncertainty_option
-  case 'mass'
-    nominal_value = nominal_model.mass;
-  case 'friction'
-    nominal_value = nominal_model.bv;
-  case 'armature_resistance'
-    nominal_value = nominal_model.armature_resistance;
-  case 'robot_radius'
-    nominal_value = nominal_model.robot_radius;
-  case 'wheel_radius'
-    nominal_value = nominal_model.wheel_radius;
-  otherwise
-      disp('Unknown uncertainty option');
-      return
-end
+uncertainty_mass_vec = [
+  nominal_model.mass*(1 - mass_delta), ...
+  nominal_model.mass*(1 + mass_delta)
+];
 
-uncertainty_vec = [nominal_value*(1 - delta), nominal_value*(1 + delta)];
+uncertainty_inertia_vec = [
+  nominal_model.inertia*(1 - inertia_delta), ...
+  nominal_model.inertia*(1 + inertia_delta)
+];
+
+uncertainty_robot_radius_vec = [
+  nominal_model.robot_radius*(1 - robot_radius_delta), ...
+  nominal_model.robot_radius*(1 + robot_radius_delta)
+];
+
+uncertainty_armature_resistance_vec = [
+  nominal_model.armature_resistance*(1 - armature_resistance_delta), ...
+  nominal_model.armature_resistance*(1 + armature_resistance_delta)
+];
 
 % =============================================================================
 % State-space variables size
@@ -79,7 +82,7 @@ opts.solver = 'sdpt3';
 % MPC tunning
 % =============================================================================
 
-q = 1:9:1000;
+q = 101:9:1000;
 r = 10000;
 
 lmi_norm_with_uncertainty_vec = zeros(size(q));
@@ -104,44 +107,35 @@ for q_sample = q
     Gd = sdpvar(9, 9, 'full');
     mu = 0;
     mu = sdpvar(1);
-    for i = 1:size(uncertainty_vec, 2)
-      % for j = 1:size(uncertainty_vec, 2)
+    for i = 1:size(uncertainty_mass_vec, 2)
+      for j = 1:size(uncertainty_inertia_vec, 2)
+        for k = 1:size(uncertainty_robot_radius_vec, 2)
+          for l = 1:size(uncertainty_armature_resistance_vec, 2)
+            robot_param.mass = uncertainty_mass_vec(i);
+            robot_param.inertia = uncertainty_inertia_vec(j);
+            robot_param.robot_radius = uncertainty_robot_radius_vec(k);
+            robot_param.armature_resistance = uncertainty_armature_resistance_vec(l);
 
-        switch uncertainty_option
-          case 'mass'
-            robot_param.mass = uncertainty_vec(i);
-          case 'friction'
-            robot_param.bv = uncertainty_vec(i);
-          case 'armature_resistance'
-            robot_param.armature_resistance = uncertainty_vec(i);
-          case 'robot_radius'
-            robot_param.robot_radius = uncertainty_vec(i);
+            [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(robot_param, ... 
+                                                        sampling_period, prediction_horizon, ...
+                                                        control_horizon, ...
+                                                        r, q_sample);
+            % Augmented system size
+            n = size(Almi,1);
+            Pd = sdpvar(n);
+
+            ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs); ...
+                            Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
+                            Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
+                            zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
+
+          % Norm computation of the vertex for the closed-loop system
+          % closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
+          % vertex_norm = norm(closed_loop_ss, inf);
+          % matlab_vertex_norm_vec(loop_index, i) = vertex_norm;
+          end
         end
-
-        % if j == 1
-        %   robot_param.armature_resistance = robot_param.armature_resistance*(1 - 0.2);
-        % else
-        %   robot_param.armature_resistance = robot_param.armature_resistance*(1 + 0.2);
-        % end
-
-        [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(robot_param, ... 
-                                                    sampling_period, prediction_horizon, ...
-                                                    control_horizon, ...
-                                                    r, q_sample);
-        % Augmented system size
-        n = size(Almi,1);
-        Pd = sdpvar(n);
-
-        ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs); ...
-                        Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
-                        Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
-                        zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
-
-      % Norm computation of the vertex for the closed-loop system
-      closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
-      vertex_norm = norm(closed_loop_ss, inf);
-      matlab_vertex_norm_vec(loop_index, i) = vertex_norm;
-      % end
+      end
     end
   
     objective = mu;
@@ -187,79 +181,20 @@ end
 close(waitbar_fig)
 
 % =============================================================================
-figure("Name", "Vertex Norms")
-% =============================================================================
-
-subplot(2,2,1)
-plot_norms(q, 90, matlab_vertex_norm_vec(:,1), "Vertex 1", "||H||_\infty")
-
-subplot(2,2,2)
-plot_norms(q, 90, matlab_vertex_norm_vec(:,2), "Vertex 2", "||H||_\infty")
-
-subplot(2,2,3)
-plot_norms(q, 90, matlab_vertex_norm_vec(:,1)- matlab_vertex_norm_vec(:,2), ...
-           "Vertex 1 - Vertex 2", "||H||_\infty differences")
-
-subplot(2,2,4)
-max_vertex_norm = max(matlab_vertex_norm_vec, [], 2)';
-plot_norms(q, 90, max_vertex_norm, "Max norm of the two vertices", "||H||_\infty")
-
-% =============================================================================
 figure("Name", "Norms by LMI")
 % =============================================================================
 
-subplot(2,2,1)
-plot_norms(q, 90, lmi_norm_with_uncertainty_vec, ...
-           "||H||_\infty by LMI with uncertainty", "||H||_\infty")
-
-subplot(2,2,2)
-plot_norms(q, 90, lmi_norm_without_uncertainty_vec, ...
-           "||H||_\infty by LMI without uncertainty", "||H||_\infty")
-
-subplot(2,2,3)
-plot_norms(q, 90, lmi_norm_with_uncertainty_vec - lmi_norm_without_uncertainty_vec, ...
-           "||H||_\infty by LMI with uncertainty - ||H||_\infty by LMI without uncertainty", ...
-           "||H||_\infty")
-
-subplot(2,2,4)
-plot_norms(q, 90, lmi_norm_with_uncertainty_vec - max_vertex_norm, ...
-           "||H||_\infty by LMI with uncertainty - max ||H||_\infty by Matlab of the two vertices", ...
-           "||H||_\infty norm")
-
-% =============================================================================
-figure("Name", "Norms of Nominal Model by LMI and Matlab")
-% =============================================================================
-
-subplot(3,1,1)
-plot_norms(q, 90, matlab_norm_without_uncertainty_vec, ...
-           "||H||_\infty by Matlab for the nominal model", "||H||_\infty")
-
-subplot(3,1,2)
-plot_norms(q, 90, lmi_norm_without_uncertainty_vec, ...
-           "||H||_\infty by LMI for the nominal model", "||H||_\infty")
-
-subplot(3,1,3)
-plot_norms(q, 90, matlab_norm_without_uncertainty_vec - lmi_norm_without_uncertainty_vec, ...
-           "||H||_\infty by Matlab - ||H||_\infty by LMI for the nominal model", ...
-           "||H||_\infty")
+plot_overlapping_norms(q, 90, lmi_norm_with_uncertainty_vec, ...
+                       matlab_norm_without_uncertainty_vec, ...
+                       {'With uncertainty', 'Without uncertainty'})
 
 % =============================================================================
 figure("Name", "Maximum delay allowed by LMI and Matlab")
 % =============================================================================
 
-subplot(3,1,1)
-plot_nmax(q, 90, matlab_nmax_without_uncertainty_vec, ...
-          "Maximum delay allowed by Matlab ||H||_\infty  for the nominal model")
-
-subplot(3,1,2)
-plot_nmax(q, 90, lmi_nmax_with_uncertainty_vec, ...
-          "Maximum delay allowed by LMI ||H||_\infty  for the model with uncertainty")
-
-subplot(3,1,3)
 plot_overlapping_nmax(q, 90, matlab_nmax_without_uncertainty_vec, ...
                       lmi_nmax_with_uncertainty_vec, ...
-                      "Comparison between the maximum delay allowed by Matlab and LMI", ...
-                      {'Without uncertainty', 'With uncertainty'})
+                      "", {'Without uncertainty', 'With uncertainty'})
 
 function max_delay = get_maximum_delay(norm)
   max_delay = 0;
