@@ -82,7 +82,7 @@ opts.solver = 'sdpt3';
 % MPC tunning
 % =============================================================================
 
-q = 101:9:1000;
+q = 91:9:1000;
 r = 10000;
 
 lmi_norm_with_uncertainty_vec = zeros(size(q));
@@ -181,16 +181,24 @@ end
 close(waitbar_fig)
 
 % =============================================================================
-figure("Name", "Norms by LMI")
+figure1 = figure("Name", "Norms by LMI");
 % =============================================================================
+
+axes1 = axes('Parent',figure1,...
+    'Position',[0.101785714285714 0.102380952380952 0.869642857142857 0.876190476190477]);
+hold(axes1,'on');
 
 plot_overlapping_norms(q, 90, lmi_norm_with_uncertainty_vec, ...
                        matlab_norm_without_uncertainty_vec, ...
                        {'With uncertainty', 'Without uncertainty'})
 
 % =============================================================================
-figure("Name", "Maximum delay allowed by LMI and Matlab")
+figure2 = figure("Name", "Maximum delay allowed by LMI and Matlab");
 % =============================================================================
+
+axes1 = axes('Parent',figure2,...
+    'Position',[0.0736842105263158 0.113801452784504 0.889473684210526 0.864406779661017]);
+hold(axes1,'on');
 
 plot_overlapping_nmax(q, 90, matlab_nmax_without_uncertainty_vec, ...
                       lmi_nmax_with_uncertainty_vec, ...
