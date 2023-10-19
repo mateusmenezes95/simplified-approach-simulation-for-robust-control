@@ -8,3 +8,5 @@ slprj/
 *.slx.autosave
 
 images/
+yalmip/
+sdpt3/
