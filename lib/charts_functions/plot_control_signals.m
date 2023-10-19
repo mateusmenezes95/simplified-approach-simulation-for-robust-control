@@ -1,4 +1,4 @@
-function plot_control_signals(t, u, legend_name, line_spec, line_thickness)
+function plot_control_signals(t, u, legend_name, line_spec, line_thickness, ylabel_prefix)
   control_signals = size(u, 2);
 
   for i=1:control_signals
@@ -12,7 +12,7 @@ function plot_control_signals(t, u, legend_name, line_spec, line_thickness)
     hold on
     grid on
     xlabel('Tempo (s)');
-    ylabel(['u_' num2str(i) ' [V]']);
+    ylabel([ylabel_prefix num2str(i) ' [V]']);
     ylim([min(u(:,i))-0.1 max(u(:,i))+0.1])
   end
 end
