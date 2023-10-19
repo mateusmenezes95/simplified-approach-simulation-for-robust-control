@@ -20,9 +20,9 @@ sim_time = 100;  % Choosen due results inpection
 %==============================================================================
 % Plot Parameters
 %==============================================================================
-save_figures = false;
+save_figures = true;
 font_size = 10;
-line_thickness = 1;
+line_thickness = 0.8;
 y_axis_limits_offset = 0.2;
 figure_idx = 1;
 plot_step_response = false;
@@ -88,50 +88,28 @@ param_name = 'worst-scenario';
 loop_step_params_str = ['q = ' num2str(q) ', r = ' num2str(r) ' and ' param_name];
 print_section_description(['Running Robot Simulation on Simulink with parameters: ' loop_step_params_str])
 
-plot_line_styles = ["-.m", "--b", "-r"];
-clipped_plot_line_styles = ["-.m", ":b", "-r"];
+plot_line_styles = ["-r", "-.b"];
+clipped_plot_line_styles = plot_line_styles; 
 figures = [];
-control_signals_norm = [0 0 0];
-control_signals_diff_norm = [0 0 0];
+control_signals_norm = [0 0];
+control_signals_diff_norm = [0 0];
 
 for i=1:2
     figure_idx = 1;
 
-    switch param_name
-      case 'mass'
-        robot_param.mass = uncertainty_mass_vec(i);
-        param_value = uncertainty_mass_vec(i);
-      case 'inertia'
-        robot_param.inertia = uncertainty_inertia_vec(i);
-        param_value = uncertainty_inertia_vec(i);
-      case 'robot-radius'
-        robot_param.robot_radius = uncertainty_robot_radius_vec(i);
-        param_value = uncertainty_robot_radius_vec(i);
-      case 'arm-res'
-        robot_param.armature_resistance = uncertainty_armature_resistance_vec(i);
-        param_value = uncertainty_armature_resistance_vec(i);
-      case 'worst-scenario'
-        if (i == 1)
-          robot_param.mass = uncertainty_mass_vec(parameter_condition_as_int('nominal'));
-          robot_param.inertia = uncertainty_inertia_vec(parameter_condition_as_int('nominal'));
-          robot_param.robot_radius = uncertainty_robot_radius_vec(parameter_condition_as_int('nominal'));
-          robot_param.armature_resistance = uncertainty_armature_resistance_vec(parameter_condition_as_int('nominal'));
-        else
-          robot_param.mass = uncertainty_mass_vec(parameter_condition_as_int('upper'));
-          robot_param.inertia = uncertainty_inertia_vec(parameter_condition_as_int('lower'));
-          robot_param.robot_radius = uncertainty_robot_radius_vec(parameter_condition_as_int('upper'));
-          robot_param.armature_resistance = uncertainty_armature_resistance_vec(parameter_condition_as_int('lower'));
-        end
-        param_value = 0;
-      case 'all'
-        robot_param.mass = uncertainty_mass_vec(i);
-        robot_param.inertia = uncertainty_inertia_vec(i);
-        robot_param.robot_radius = uncertainty_robot_radius_vec(i);
-        robot_param.armature_resistance = uncertainty_armature_resistance_vec(i);
-        param_value = 0;
+    if (i == 1)
+      robot_param.mass = uncertainty_mass_vec(parameter_condition_as_int('nominal'));
+      robot_param.inertia = uncertainty_inertia_vec(parameter_condition_as_int('nominal'));
+      robot_param.robot_radius = uncertainty_robot_radius_vec(parameter_condition_as_int('nominal'));
+      robot_param.armature_resistance = uncertainty_armature_resistance_vec(parameter_condition_as_int('nominal'));
+      legend_str = 'Nominal';
+    else
+      robot_param.mass = uncertainty_mass_vec(parameter_condition_as_int('upper'));
+      robot_param.inertia = uncertainty_inertia_vec(parameter_condition_as_int('lower'));
+      robot_param.robot_radius = uncertainty_robot_radius_vec(parameter_condition_as_int('upper'));
+      robot_param.armature_resistance = uncertainty_armature_resistance_vec(parameter_condition_as_int('lower'));
+      legend_str = 'Polyhedron Vertex';
     end
-
-    current_parameter_str = ['Model parameter ' param_name ' = ' num2str(param_value)];
 
     [Aaug, Baug, Caug, A, B, C, D] = get_model_matrices(robot_param, sampling_period);
     [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
@@ -142,7 +120,7 @@ for i=1:2
     % Run Simulation
     %==============================================================================
 
-    print_section_description(['Running Robot Simulation on Simulink to ' param_name ' = ' num2str(param_value)])
+    print_section_description(['Running Robot Simulation on Simulink to ' legend_str])
     sim_out = sim('../simulink/robot.slx');
     print_section_description("Robot Simulation Finished!")
     %==============================================================================
@@ -150,21 +128,21 @@ for i=1:2
     %==============================================================================
     % Plot trajectories
     %==============================================================================
-    [figures, figure_idx] = select_figure(figures, ['Trajectory | params: ' loop_step_params_str], i, figure_idx);
+    [figures, figure_idx] = select_figure(figures, ['Trajectory | Condition: ' legend_str], i, figure_idx);
     if i == 1
-        plot_robot_trajectory(x_trajectory, y_trajectory, 'Referência', '--k', line_thickness)
+        plot_robot_trajectory(x_trajectory, y_trajectory, 'Reference', '--k', line_thickness)
         xlim(trajectory_limits);
         ylim(trajectory_limits);
         hold on
     end
-    plot_robot_trajectory(sim_out.x, sim_out.y, [param_name ' = ' num2str(param_value)], plot_line_styles(i), line_thickness)
+    plot_robot_trajectory(sim_out.x, sim_out.y, legend_str, plot_line_styles(i), line_thickness)
     hold on
     %==============================================================================
 
     %==============================================================================
     % Plot clipped trajectories
     %==============================================================================
-    [figures, figure_idx] = select_figure(figures, ['Clipped Trajectory | params: ' loop_step_params_str], i, figure_idx);
+    [figures, figure_idx] = select_figure(figures, ['Clipped Trajectory | Condition: ' legend_str], i, figure_idx);
     f = figure(figures(figure_idx-1));
     f.Position = [1435 712 732 617];
     if i == 1
@@ -173,7 +151,8 @@ for i=1:2
         % plot_robot_trajectory(x_trajectory(start_idx:end_idx), y_trajectory(start_idx:end_idx), 'referencia', '--k', line_thickness)
         % hold on
     end
-    plot_robot_trajectory(sim_out.x(start_idx:end_idx), sim_out.y(start_idx:end_idx), [param_name ' = ' num2str(param_value)], clipped_plot_line_styles(i), line_thickness)
+    plot_robot_trajectory(sim_out.x(start_idx:end_idx), sim_out.y(start_idx:end_idx),...
+                          legend_str, clipped_plot_line_styles(i), line_thickness)
     legend({}, Location="southeast", FontSize=12)
     hold on
     %==============================================================================
@@ -181,30 +160,30 @@ for i=1:2
     %==============================================================================
     % Plot control signals
     %==============================================================================
-    [figures, figure_idx] = select_figure(figures, ['Control Signals | params: ' loop_step_params_str], i, figure_idx);
+    [figures, figure_idx] = select_figure(figures, ['Control Signals | Condition: ' legend_str], i, figure_idx);
     plot_control_signals(sim_out.sim_time_sampled, [sim_out.u1 sim_out.u2 sim_out.u3], ...
-                         [param_name ' = ' num2str(param_value)], plot_line_styles(i), line_thickness, 'u_')
+                         legend_str, plot_line_styles(i), line_thickness, 'u_')
     hold on
     %==============================================================================
 
     %==============================================================================
-    % Plot control signals difference
+    % Plot control signals increment
     %==============================================================================
-    [figures, figure_idx] = select_figure(figures, ['Control Signals | params: ' loop_step_params_str], i, figure_idx);
+    [figures, figure_idx] = select_figure(figures, ['Control Signals Increment | Condition: ' legend_str], i, figure_idx);
     plot_control_signals(sim_out.sim_time_sampled, [sim_out.delta_u1 sim_out.delta_u2 sim_out.delta_u3], ...
-                         [param_name ' = ' num2str(param_value)], plot_line_styles(i), line_thickness, '\Deltau_')
+                         legend_str, plot_line_styles(i), line_thickness, '\Deltau_')
     hold on
     %==============================================================================
 
     %==============================================================================
     % Plot cliped control signals
     %==============================================================================
-    [figures, figure_idx] = select_figure(figures, ['Clipped Control Signals | params: ' loop_step_params_str], i, figure_idx);
+    [figures, figure_idx] = select_figure(figures, ['Clipped Control Signals | Condition: ' legend_str], i, figure_idx);
     f = figure(figures(figure_idx-1));
     f.Position = [1435 712 732 617];
     control_signals = [sim_out.u1(start_idx:end_idx) sim_out.u2(start_idx:end_idx) sim_out.u3(start_idx:end_idx)];
     plot_control_signals(sim_out.sim_time_sampled(start_idx:end_idx), control_signals, ...
-                         [param_name ' = ' num2str(param_value)], clipped_plot_line_styles(i), 1.5*line_thickness, 'u_')
+                         legend_str, clipped_plot_line_styles(i), 1.5*line_thickness, 'u_')
     for m=1:3
         subplot(3,1,m)
         xlim([clipped_trajectory_start_time clipped_trajectory_end_time])
@@ -214,14 +193,14 @@ for i=1:2
     %==============================================================================
 
     %==============================================================================
-    % Plot cliped control signals difference
+    % Plot cliped control signals increment
     %==============================================================================
-    [figures, figure_idx] = select_figure(figures, ['Clipped Control Signals | params: ' loop_step_params_str], i, figure_idx);
+    [figures, figure_idx] = select_figure(figures, ['Clipped Control Signals Increment | Condition: ' legend_str], i, figure_idx);
     f = figure(figures(figure_idx-1));
     f.Position = [1435 712 732 617];
     control_signals = [sim_out.delta_u1(start_idx:end_idx) sim_out.delta_u2(start_idx:end_idx) sim_out.delta_u3(start_idx:end_idx)];
     plot_control_signals(sim_out.sim_time_sampled(start_idx:end_idx), control_signals, ...
-                         [param_name ' = ' num2str(param_value)], clipped_plot_line_styles(i), 1.5*line_thickness, '\Deltau_')
+                         legend_str, clipped_plot_line_styles(i), 1.5*line_thickness, '\Deltau_')
     for m=1:3
         subplot(3,1,m)
         xlim([clipped_trajectory_start_time clipped_trajectory_end_time])
@@ -238,48 +217,48 @@ end
 
 figure()
 subplot(1,3,1)
-x_labels = {'Nominal', 'Lower', 'Upper'};
-b = bar(1:3, control_signals_norm);
+x_labels = {'Nominal', 'Polyhedron Vertex'};
+b = bar(1:2, control_signals_norm);
 xticklabels(x_labels);
 y_tips = b.YEndPoints;
 labels = string(b.YData);
 text(b.XEndPoints,y_tips,labels,'HorizontalAlignment','center',...
 'VerticalAlignment','bottom')
-xlabel('Parameter condition')
+xlabel('Dynamic model parameters condition')
 ylabel('||u||_2')
 
 subplot(1,3,2)
-x_labels = {'Nominal', 'Lower', 'Upper'};
-b = bar(1:3, control_signals_diff_norm);
+b = bar(1:2, control_signals_diff_norm);
 xticklabels(x_labels);
 y_tips = b.YEndPoints;
 labels = string(b.YData);
 text(b.XEndPoints,y_tips,labels,'HorizontalAlignment','center',...
 'VerticalAlignment','bottom')
-xlabel('Parameter condition')
+xlabel('Dynamic model parameters condition')
 ylabel('||\Deltau||_2')
 
 subplot(1,3,3)
-x_labels = {'Nominal', 'Lower', 'Upper'};
-b = bar(1:3, control_signals_norm./control_signals_diff_norm);
+b = bar(1:2, control_signals_norm./control_signals_diff_norm);
 xticklabels(x_labels);
 y_tips = b.YEndPoints;
 labels = string(b.YData);
 text(b.XEndPoints,y_tips,labels,'HorizontalAlignment','center',...
 'VerticalAlignment','bottom')
-xlabel('Parameter condition')
+xlabel('Dynamic model parameters condition')
 ylabel('||u||_2\\||\Deltau||_2')
 
-figure_folder_name = 'axebot-simulation-v2';
+figure_folder_name = 'axebot-simulation-path-following-comparison';
 
 if save_figures
   lar_folder_path = fullfile(getenv('HOME'), 'Documents', 'lars', figure_folder_name);
-  figures_folder = fullfile(lar_folder_path, [param_name + "-vertex"]);
+  figures_folder = lar_folder_path;
 
   figures_names = ["trajectory",...
                   "clipped_trajectory",...
                   "control_signals",...
+                  "control_signals_increment",...
                   "clipped_control_signals",...
+                  "clipped_control_signals_increment",...
                   "control_signals_norm"];
 
   if ~isfolder(figures_folder)
@@ -287,12 +266,12 @@ if save_figures
     disp('Folder created successfully.');
   end
 
-  for i=1:5
+  for i=1:length(figures)
       figure(i)
-      saveas(i, fullfile(figures_folder, [param_name + "-vertex-" + figures_names(i) + ".jpeg"]), 'jpeg')
+      saveas(i, fullfile(figures_folder, [figures_names(i) + ".eps"]), 'epsc')
   end
 
-  disp('Figures saved successfully in ' + figures_folder);
+  disp("Figures saved successfully in " + figures_folder);
   close all
 end
 
