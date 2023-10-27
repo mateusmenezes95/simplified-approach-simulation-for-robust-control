@@ -2,11 +2,17 @@ clc
 clear all
 close all
 
-addpath(genpath("../lib")) 
-addpath(genpath("../lib/mpc_functions")) 
+current_script_path = fileparts(mfilename('fullpath'));
+cd(current_script_path)
+
+addpath(genpath("../lib"))
+addpath(genpath("../lib/mpc_functions"))
+addpath(genpath("../lib/chart_functions/norms"))
+addpath(genpath("../lib/dynamic_models"))
+addpath(genpath("../lib/robot_models"))
 
 run simulation_parameters
-run robot_model
+run bluerov2_model
 
 print_section_description("Running script for Kao criteria...")
 
@@ -17,7 +23,7 @@ q = 1:9:1000;
 Nmax_vector = zeros(size(q));
 Cnorm_vector = zeros(size(q));
 
-r=10000;
+r=10;
 
 loop_index= 1;
 for q_sample = q
