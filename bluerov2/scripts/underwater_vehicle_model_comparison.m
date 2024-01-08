@@ -13,7 +13,7 @@ addpath(genpath("../lib/robot_models"))
 addpath(genpath("../bluerov2/functions"))
 
 % Run some scripts to load the simulation parameters
-run simulation_parameters
+run bluerov2_simulation_parameters
 run bluerov2_model
 
 models = [manzanilla_model; lipenitis_model; benzon_model; lower_model; upper_model; nominal_model];

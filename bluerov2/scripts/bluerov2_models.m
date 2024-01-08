@@ -1,7 +1,7 @@
 current_script_path = fileparts(mfilename('fullpath'));
 addpath(genpath(current_script_path  + "/../../lib")) 
 
-run simulation_parameters
+run bluerov2_simulation_parameters
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MANZANILLA, A. et al. Autonomous navigation for unmanned underwater vehicles:

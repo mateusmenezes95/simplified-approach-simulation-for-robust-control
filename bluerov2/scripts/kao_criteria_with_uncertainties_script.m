@@ -10,7 +10,7 @@ addpath(genpath("../../../lib/chart_functions/norms"))
 addpath(genpath("../../../lib/robot_models"))
 addpath(genpath("../function/matrices_getters"))
 
-run simulation_parameters
+run bluerov2_simulation_parameters
 run bluerov2_model
 
 robot_radius_delta = 0.05;

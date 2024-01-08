@@ -6,15 +6,12 @@ cd(current_script_path)
 
 % Add paths so that we can use the functions from the files in the lib folder
 addpath(genpath("."))
-addpath(genpath("../../lib"))
+addpath(genpath("../functions/"))
 addpath(genpath("../../lib/mpc_functions"))
-addpath(genpath("../../lib/chart_functions/norms"))
-addpath(genpath("../../lib/dynamic_models"))
-addpath(genpath("../../lib/robot_models"))
-addpath(genpath("../functions/matrices_getters"))
+addpath(genpath("../../lib/utils"))
 
 % Run some scripts to load the simulation parameters
-run simulation_parameters
+run bluerov2_simulation_parameters
 run bluerov2_models
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -27,10 +24,20 @@ dynamic_model.gravity_vector = zeros(state_vector_size, 1);
 
 integration_step = 0.001;
 simulation_time = 100.0;
+num_of_simulation_steps = simulation_time/integration_step;
 t = zeros(1, simulation_time/integration_step);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % End of simulation parameters section
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%==============================================================================
+% Plot Parameters
+%==============================================================================
+font_size = 10;
+line_thickness = 1.25;
+y_axis_limits_offset = 0.2;
+figure_idx = 1;
+%==============================================================================
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % References parameters
@@ -38,7 +45,7 @@ t = zeros(1, simulation_time/integration_step);
 set_point.begin = 5.0;
 set_point.end = 70.0;
 
-references = fill_references_array(state_vector_size, size(t, 2), set_point, integration_step, [0.2; 0.0; 0.0; 0.0]);
+references = fill_references_array(state_vector_size, size(t, 2), set_point, integration_step, [0.0; 0.1; 0.0; 0.0]);
 horizon_refs = zeros(prediction_horizon*state_vector_size, 1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % End of Reference parameters section
@@ -60,7 +67,8 @@ r = 1000;
 u = zeros(size(t, 2), 1);
 u_last = zeros(state_vector_size, 1);
 
-states_value = zeros(state_vector_size, simulation_time/integration_step);
+states_value = zeros(state_vector_size, num_of_simulation_steps);
+generalized_forces = zeros(state_vector_size, num_of_simulation_steps);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % End of MPC Tunning and Initialization section
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -97,7 +105,7 @@ while true
 	u = delta_u(1:state_vector_size,1) + u_last;
 	u_last = u;
 
-	control_signal.X(k) = u(1);
+	generalized_forces(:, k) = u;
 	states_value(:, k+1) = rk4(@nonlinear_map, states_value(:, k), u, dynamic_model, integration_step);
 
 	k = k + 1;
@@ -109,24 +117,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Charts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-figure(1)
-plot(t(1:end-1), control_signal.X)
-grid on
-xlabel('Time [s]')
-ylabel('Control signal [N]')
-title('Control signal X')
+figure("Name", "bluerov-states")
+plot_bluerov_states(t, states_value, -1, '-r', line_thickness)
 
-figure(2)
-plot(t, states_value(1, :))
-grid on
-hold on
-plot(t, references(1, :))
-xlabel('Time [s]')
-ylabel('Velocity [m]')
-title('Velocity u')
-labels = {'Velocity', 'Setpoint'};
-legend(labels)
-ylim([-0.05 0.15])
+figure("Name", "bluerov-control-signals")
+plot_generalized_forces(t, generalized_forces, -1, '-r', line_thickness)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % End of charts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
