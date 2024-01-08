@@ -1,10 +1,5 @@
 current_script_path = fileparts(mfilename('fullpath'));
-cd(current_script_path)
-
-addpath(genpath("../lib")) 
-addpath(genpath("../lib/mpc_functions"))
-addpath(genpath("../lib/chart_fpatunctions/norms"))
-addpath(genpath("../lib/dynamic_models"))
+addpath(genpath(current_script_path  + "/../../lib")) 
 
 run simulation_parameters
 
