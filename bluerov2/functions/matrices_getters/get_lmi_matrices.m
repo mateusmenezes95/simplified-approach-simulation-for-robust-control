@@ -1,7 +1,4 @@
-function [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(dynamic_model, dt, np, nu, r_weight, q_weight) 
-    % Augmented state-space due the integrator addition
-    % [Aaug, Baug, Caug, A, B, C, D] = get_model_matrices(model_params, dt);
-  
+function [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(dynamic_model, dt, np, nu, r_weight, q_weight)
     dynamic_model.rigid_body_inertia_matrix = get_rigid_body_inertia_matrix(dynamic_model);
     dynamic_model.added_mass_system_inertia_matrix = get_added_mass_system_inertia_matrix(dynamic_model);
     dynamic_model.linear_damping_matrix = get_linear_damping_matrix(dynamic_model);

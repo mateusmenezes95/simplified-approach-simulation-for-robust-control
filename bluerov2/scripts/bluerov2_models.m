@@ -1,5 +1,5 @@
 current_script_path = fileparts(mfilename('fullpath'));
-addpath(genpath(current_script_path  + "/../../lib")) 
+addpath(genpath(current_script_path  + "/../../lib/utils")) 
 
 run bluerov2_simulation_parameters
 

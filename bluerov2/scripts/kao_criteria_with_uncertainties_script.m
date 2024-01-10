@@ -4,14 +4,14 @@ clear
 current_script_path = fileparts(mfilename('fullpath'));
 cd(current_script_path)
 
-addpath(genpath("../../../lib")) 
-addpath(genpath("../../../lib/mpc_functions"))
-addpath(genpath("../../../lib/chart_functions/norms"))
-addpath(genpath("../../../lib/robot_models"))
-addpath(genpath("../function/matrices_getters"))
+addpath(genpath("."))
+addpath(genpath("../../lib/utils")) 
+addpath(genpath("../../lib/mpc_functions"))
+addpath(genpath("../../lib/charts_functions/norms"))
+addpath(genpath("../functions/matrices_getters"))
 
 run bluerov2_simulation_parameters
-run bluerov2_model
+run bluerov2_models
 
 robot_radius_delta = 0.05;
 armature_resistance_delta = 0.3;
@@ -50,8 +50,8 @@ opt.allownonconvex = 0;
 % MPC tunning
 % =============================================================================
 
-q = 601:9:1600;
-r = 20;
+q = 11:9:1000;
+r = 1000;
 
 lmi_norm_with_uncertainty_vec = zeros(size(q));
 lmi_nmax_with_uncertainty_vec = zeros(size(q));
