@@ -1,6 +1,7 @@
 function plot_generalized_forces (t, u, legend_name, line_spec, line_thickness, ylabel_prefix)
 	generalized_forces_name = {'X', 'Y', 'Z', 'N'}; % According to SNAME notation
 	control_signals = size(generalized_forces_name, 2);
+	limit_offset = 0.5;
 
 	for i=1:control_signals
 		subplot(control_signals, 1, i)
@@ -21,7 +22,7 @@ function plot_generalized_forces (t, u, legend_name, line_spec, line_thickness, 
       ylabel([generalized_forces_name{i} ' [Nm]']);
     end
 
-		ylim([min(u(i,:))-0.1 max(u(i,:))+0.1])
+		ylim([(min(u(i,:)) - limit_offset) (max(u(i,:)) + limit_offset)])
 
 		if i == 1
 			title('Generalized forces (control signals)')

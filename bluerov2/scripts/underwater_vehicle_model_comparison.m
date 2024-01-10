@@ -177,17 +177,21 @@ function plot_robot_states(t, linear_x, nonlinear_x, line_thickness, states_name
 
   for i=1:num_states
     subplot(num_states, 1, i)
+
     plot(t, linear_x(i, :), "-" + line_color, 'linewidth', line_thickness, 'DisplayName', model_name + " Linear")
     hold on
     plot(t, nonlinear_x(i, :), "--" + line_color, 'linewidth', line_thickness, 'DisplayName', model_name + " Nonlinear")
+
     if i == 1
       legend('show')
     end
+
     grid on
     xlabel('Tempo (s)');
+
     if i < num_states
-    ylim([0 0.25])
-    ylabel([states_name{i} ' [m/s]']);
+      ylim([0 0.25])
+      ylabel([states_name{i} ' [m/s]']);
     else
       ylabel([states_name{i} ' [rad/s]']);
     end
