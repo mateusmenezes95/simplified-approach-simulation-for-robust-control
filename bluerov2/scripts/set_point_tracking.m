@@ -118,11 +118,14 @@ while true
 
 	ksi = [delta_xk; states_value(:, k)];    % In this case, y[k] is the state vector due to C = I
 	delta_u = kw*horizon_refs - kmpc*ksi;
-	u = delta_u(1:state_vector_size,1) + u_last;
-	u_last = u;
 
-	generalized_forces(:, k) = u;
-	states_value(:, k+1) = rk4(@nonlinear_map, states_value(:, k), u, dynamic_model, integration_step);
+	if k == 1
+		generalized_forces(:, k) = delta_u(1:state_vector_size,1);
+	else
+		generalized_forces(:, k) = delta_u(1:state_vector_size,1) + generalized_forces(:, k-1);
+	end
+
+	states_value(:, k+1) = rk4(@nonlinear_map, states_value(:, k), generalized_forces(:, k), dynamic_model, integration_step);
 
 	k = k + 1;
 end
