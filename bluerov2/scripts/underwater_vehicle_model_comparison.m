@@ -5,16 +5,16 @@ current_script_path = fileparts(mfilename('fullpath'));
 cd(current_script_path)
 
 % Add paths so that we can use the functions from the files in the lib folder
-addpath(genpath("../lib"))
+addpath(genpath("."))
+
+addpath(genpath("../lib/utils"))
 addpath(genpath("../lib/mpc_functions"))
 addpath(genpath("../lib/chart_functions/norms"))
-addpath(genpath("../lib/dynamic_models"))
-addpath(genpath("../lib/robot_models"))
 addpath(genpath("../bluerov2/functions"))
 
 % Run some scripts to load the simulation parameters
 run bluerov2_simulation_parameters
-run bluerov2_model
+run bluerov2_models
 
 models = [manzanilla_model; lipenitis_model; benzon_model; lower_model; upper_model; nominal_model];
 linear_plot_line_styles = ["-r", '-b', '-g'];

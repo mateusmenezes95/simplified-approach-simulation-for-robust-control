@@ -104,4 +104,3 @@ function [discrete_state_space, augmented_state_space] = get_state_space_matrix(
 
     augmented_state_space.Caug = [zeros(state_vector_size) eye(state_vector_size)];
 end
-  
