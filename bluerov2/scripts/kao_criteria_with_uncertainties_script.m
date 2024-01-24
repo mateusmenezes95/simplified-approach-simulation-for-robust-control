@@ -13,19 +13,19 @@ addpath(genpath("../functions/matrices_getters"))
 run bluerov2_simulation_parameters
 run bluerov2_models
 
-robot_radius_delta = 0.05;
-armature_resistance_delta = 0.3;
-
-models = [lower_model, upper_model];
+models = [
+  lower_model, ...
+  upper_model
+];
 
 uncertainty_mass_vec = [
-  manzanilla_model.mass, ...
-  benzon_model.mass
+  lower_model.mass, ...
+  upper_model.mass
 ];
 
 uncertainty_inertia_vec = [
-  manzanilla_model.inertia.zz, ...
-  benzon_model.inertia.zz
+  lower_model.inertia.zz, ...
+  upper_model.inertia.zz
 ];
 
 % =============================================================================
@@ -50,7 +50,7 @@ opt.allownonconvex = 0;
 % MPC tunning
 % =============================================================================
 
-q = 11:9:1000;
+q = 511:9:1500;
 r = 1000;
 
 lmi_norm_with_uncertainty_vec = zeros(size(q));
@@ -75,14 +75,15 @@ for q_sample = q
     Gd = sdpvar(12, 12, 'full');
     mu = 0;
     mu = sdpvar(1);
-    % dynamic_model = manzanilla_model;
+    dynamic_model = lower_model;
     for i = 1:size(uncertainty_mass_vec, 2)
-      % for j = 1:size(uncertainty_inertia_vec, 2)
-        % for k = 1:size(uncertainty_robot_radius_vec, 2)
-          % for l = 1:size(uncertainty_armature_resistance_vec, 2)
-            % dynamic_model.mass = uncertainty_mass_vec(i);
-            % dynamic_model.inertia.zz = uncertainty_inertia_vec(j);
-            dynamic_model = models(i);
+      for j = 1:size(uncertainty_inertia_vec, 2)
+        for k = 1:size(models, 2)
+          for l = 1:size(models, 2)
+            dynamic_model.mass = uncertainty_mass_vec(i);
+            dynamic_model.inertia.zz = uncertainty_inertia_vec(j);
+            dynamic_model.added_mass_coeficcients = models(k).added_mass_coeficcients;
+            dynamic_model.linear_damping_coefficients = models(l).linear_damping_coefficients;
 
             [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(dynamic_model, ... 
                                                         sampling_period, prediction_horizon, ...
@@ -96,15 +97,10 @@ for q_sample = q
                             Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
                             Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
                             zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
-
-          % Norm computation of the vertex for the closed-loop system
-          % closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
-          % vertex_norm = norm(closed_loop_ss, inf);
-          % matlab_vertex_norm_vec(loop_index, i) = vertex_norm;
-          % end
-        % end
-      % end
-    end
+          end % end for l loop
+        end % end for k loop
+      end % end for l loop
+    end % end for i loop
   
     objective = mu;
     yalmipdiagnostics = optimize(ineqs, objective, opts);
@@ -114,10 +110,6 @@ for q_sample = q
     lmi_norm_with_uncertainty = sqrt(mu);
     lmi_norm_with_uncertainty_vec(loop_index) = lmi_norm_with_uncertainty;
 
-    % Norm computation for the closed-loop system without uncertainty
-    % nominal_model = manzanilla_model;
-    % nominal_model.mass = lipenitis_model.mass;
-    % nominal_model.inertia.zz = lipenitis_model.inertia.zz;
     [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices(nominal_model, sampling_period, ...
                                                 prediction_horizon, control_horizon, r, q_sample);
     Pd = [];
