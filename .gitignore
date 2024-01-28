@@ -6,6 +6,7 @@ slprj/
 *.slxc
 *.slx.original
 *.slx.autosave
+*.xopp
 
 images/
 yalmip/

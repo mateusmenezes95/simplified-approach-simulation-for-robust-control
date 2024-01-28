@@ -50,8 +50,8 @@ opt.allownonconvex = 0;
 % MPC tunning
 % =============================================================================
 
-q = 511:9:1500;
-r = 1000;
+q = 111:9:1000;
+r = 50;
 
 lmi_norm_with_uncertainty_vec = zeros(size(q));
 lmi_nmax_with_uncertainty_vec = zeros(size(q));

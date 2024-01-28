@@ -21,10 +21,17 @@ dynamic_model = nominal_model;
 state_vector_size = size(dynamic_model.discrete_state_space.Ad, 1);
 dynamic_model.gravity_vector = [0; 0; 2.5; 0];
 
-integration_step = 0.001;
-simulation_time = 100.0;
-num_of_simulation_steps = simulation_time/integration_step;
-t = zeros(1, simulation_time/integration_step);
+integration_step_ratio = 50;
+integration_step_size = sampling_period/integration_step_ratio;
+
+simulation_time = 25;
+end_time = ceil(simulation_time/sampling_period)*sampling_period;
+
+time = 0:integration_step_size:simulation_time;
+num_of_simulation_steps = length(time);
+sim_time = zeros(1, num_of_simulation_steps);
+
+num_of_samples = ceil(simulation_time/sampling_period);
 %===================================================================================================
 % End of simulation parameters section
 %===================================================================================================
@@ -46,8 +53,6 @@ path.x = 0:path_step_size:1;
 path.x = [path.x ones(1, 99)];
 temp = 0.01:path_step_size:(1-path_step_size);
 path.y = [zeros(1,101) temp];
-% references = fill_references_array(vel_references_struct);
-% horizon_refs = zeros(prediction_horizon*state_vector_size, 1);
 %===================================================================================================
 % End of Reference parameters section
 %===================================================================================================
@@ -59,63 +64,90 @@ Aaug = dynamic_model.augmented_state_space.Aaug;
 Baug = dynamic_model.augmented_state_space.Baug;
 Caug = dynamic_model.augmented_state_space.Caug;
 
-q = 100;
-r = 1000;
+q = 350;
+r = 50;
 
 [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
 [kw, kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, q, r, prediction_horizon, control_horizon);
-
-u = zeros(size(t, 2), 1);
-u_last = zeros(state_vector_size, 1);
-
-states_value = zeros(state_vector_size, num_of_simulation_steps);
-generalized_forces = zeros(state_vector_size, num_of_simulation_steps);
 
 params.state_vector_size = state_vector_size;
 params.prediction_horizon = prediction_horizon;
 params.current_time_step = 1;
 params.navigation_velocity = 0.2;
 
-waypoints = generate_square_trajectory(1, params.navigation_velocity, integration_step);
-horizon_refs = get_vel_horizon_refs(states_value(:, 1), waypoints, params);
+waypoints = generate_square_trajectory(1, params.navigation_velocity, sampling_period);
+% horizon_refs = get_vel_horizon_refs(states_value(:, 1), waypoints, params);
 %===================================================================================================
 % End of MPC Tunning and Initialization section
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%===================================================================================================
+
+%===================================================================================================
+% Initial conditions section
+%===================================================================================================
+body_fixed_vel = zeros(state_vector_size, num_of_simulation_steps+1);  % v(:, 1) = [0; 0; 0; 0] -> Initial condition
+body_fixed_vel_sampled = zeros(state_vector_size, num_of_samples+1);
+
+position_and_attitude = zeros(state_vector_size, num_of_simulation_steps+1);
+position_and_attitude_sampled = zeros(state_vector_size, num_of_samples+1);
+
+generalized_forces = zeros(state_vector_size, num_of_simulation_steps+1);
+generalized_forces_sampled = zeros(state_vector_size, num_of_samples+1);
+
+non_linear_map_args.dynamic_model = dynamic_model;
+position_and_attitude_args.roll = 0;
+position_and_attitude_args.pitch = 0;
+
+delta_xk = zeros(state_vector_size, 1);
+control_signal = zeros(state_vector_size, 1);
+
+k = 1;
+%===================================================================================================
+% End of Initial conditions section
+%===================================================================================================
 
 %===================================================================================================
 % Simulation loop. Integration performed with Runge-Kutta 4th order method
 %===================================================================================================
-k = 1;
-for h=0:integration_step:simulation_time
-	t(k) = (k-1)*integration_step;
-	if t(end) >= simulation_time - integration_step
-		break
-	end
+for i=1:num_of_simulation_steps
+	sim_time(i) = (i-1)*integration_step_size;
 
-	if k == 1
-		delta_xk = zeros(state_vector_size, 1);
-	else
-		delta_xk = states_value(:, k) - states_value(:, k-1);
-	end
+	% Sample instant
+	if (mod(i, integration_step_ratio) == 1 || i == 1)
+		horizon_refs = get_vel_horizon_refs(position_and_attitude(:, i), waypoints, params);
+		horizon_ref(1:state_vector_size, k) = horizon_refs(1:state_vector_size);
+		params.current_time_step = params.current_time_step + 1;
 
-	current_pose = rk4(@body_fixed_to_inertial_frame, states_value(:, k), generalized_forces(:, k), dynamic_model, integration_step);
-	horizon_refs = get_vel_horizon_refs(current_pose, waypoints, params);
+		body_fixed_vel_sampled(:, k) = body_fixed_vel(:, i);
 
-	ksi = [delta_xk; states_value(:, k)];    % In this case, y[k] is the state vector due to C = I
-	delta_u = kw*horizon_refs - kmpc*ksi;
+		if (i > 1)
+			delta_xk = body_fixed_vel_sampled(:, k) - body_fixed_vel_sampled(:, k-1);
+		end
 
-	if k == 1
-		generalized_forces(:, k) = delta_u(1:state_vector_size,1);
-	else
-		generalized_forces(:, k) = delta_u(1:state_vector_size,1) + generalized_forces(:, k-1);
-	end
-
-	states_value(:, k+1) = rk4(@nonlinear_map, states_value(:, k), generalized_forces(:, k), dynamic_model, integration_step);
-
-	if rem(h, sampling_period) == 0
+		ksi = [delta_xk; body_fixed_vel_sampled(:, k)];    % In this case, y[k] is the state vector due to C = I
+		delta_u = kw*horizon_refs - kmpc*ksi;
+	
+		control_signal = delta_u(1:state_vector_size,1) + control_signal;
 		k = k + 1;
 	end
+
+	generalized_forces(:, i) = control_signal;
+	non_linear_map_args.tau = control_signal;
+
+	body_fixed_vel(:, i+1) = rk4(body_fixed_vel(:, i), body_fixed_vel(:, i), ...
+															 integration_step_size, @nonlinear_map, non_linear_map_args);
+
+	position_and_attitude_args.yaw = position_and_attitude(4, i);
+
+	position_and_attitude(:, i+1) = rk4(position_and_attitude(:, i), body_fixed_vel(:, i+1), ...
+																			integration_step_size, @body_fixed_to_inertial_frame, ...
+																			position_and_attitude_args);
 end
+
+% body_fixed_vel(:, 1) is the initial condition, so we remove it
+body_fixed_vel = body_fixed_vel(:, 2:end);
+position_and_attitude = position_and_attitude(:, 2:end);
+generalized_forces = generalized_forces(:, 2:end);
+
 %===================================================================================================
 % End of simulation loop
 %===================================================================================================
@@ -123,11 +155,11 @@ end
 %===================================================================================================
 % Charts
 %===================================================================================================
-figure("Name", "bluerov-states")
-plot_bluerov_states(t, states_value, '-r', line_thickness)
+% figure("Name", "bluerov-states")
+% plot_bluerov_states(t, states_value, '-r', line_thickness)
 
-figure("Name", "bluerov-control-signals")
-plot_generalized_forces(t, generalized_forces, -1, '-r', line_thickness)
+% figure("Name", "bluerov-control-signals")
+% plot_generalized_forces(t, generalized_forces, -1, '-r', line_thickness)
 % %===================================================================================================
 % End of charts
 %===================================================================================================
@@ -135,7 +167,10 @@ plot_generalized_forces(t, generalized_forces, -1, '-r', line_thickness)
 %===================================================================================================
 % Functions used exclusively in this script
 %===================================================================================================
-function x = nonlinear_map(xk, tau, dynamic_model)
+function body_fixed_vel_dot = nonlinear_map(body_fixed_vel, args)
+	xk = body_fixed_vel;
+	tau = args.tau;
+	dynamic_model = args.dynamic_model;
 	M = dynamic_model.rigid_body_inertia_matrix + dynamic_model.added_mass_system_inertia_matrix;
 	C_RB = get_rigid_body_coriolis_and_centripetal_matrix(xk, dynamic_model.mass);
 	C_A = get_added_mass_coriolis_and_centripetal_matrix(xk, dynamic_model.added_mass_system_inertia_matrix);
@@ -143,23 +178,37 @@ function x = nonlinear_map(xk, tau, dynamic_model)
 	D_v = get_quadratic_damping_matrix(xk, dynamic_model.quadratic_damping_coefficients);
 	D = dynamic_model.linear_damping_matrix + D_v;
 	G = dynamic_model.gravity_vector;
-	x = M\(tau - C*xk - D*xk - G);
+	body_fixed_vel_dot = M\(tau - C*xk - D*xk - G);
 end
 
-function eta = body_fixed_to_inertial_frame(xk, tau, dynamic_model)
-	R = [cos(xk(4)) -sin(xk(4)) 0 0; ...
-			 sin(xk(4)) cos(xk(4)) 0 0; ...
-			 0 0 1 0; ...
-			 0 0 0 1];
-	eta = R*xk;
+function y = linear_function(xn, args)
+	y = xn;
 end
 
-function xk_plus_1 = rk4(f, xk, tau, dynamic_model, h)
-  k1 = feval(f, xk, tau, dynamic_model);
-  k2 = feval(f, xk + h/2*k1, tau, dynamic_model);
-  k3 = feval(f, xk + h/2*k2, tau, dynamic_model);
-  k4 = feval(f, xk + h*k3, tau, dynamic_model);
-  xk_plus_1 = xk + h/6*(k1 + 2*k2 + 2*k3 + k4);
+function y = constant_function(yn, args)
+	y = 1;
+end
+
+function ned_vel = body_fixed_to_inertial_frame(body_fixed_vel, arg)
+	roll = arg.roll;
+	pitch = arg.pitch;
+	yaw = arg.yaw;
+	body_fixed_to_ned_rot = [
+		cos(yaw) -sin(yaw) 0 0; ...
+		sin(yaw) cos(yaw) 0 0; ...
+		0 0 1 0; ...
+		0 0 0 1];
+	ned_vel = body_fixed_to_ned_rot*body_fixed_vel;
+end
+
+% Given y' = f(x) and y(x0) = y0, this function returns y(x)
+function yn_plus_1 = rk4(yn, xn, time_step, derivative_func, derivative_func_args)
+	h = time_step;
+  k1 = feval(derivative_func, xn, derivative_func_args);
+  k2 = feval(derivative_func, xn + h/2*k1, derivative_func_args);
+  k3 = feval(derivative_func, xn + h/2*k2, derivative_func_args);
+  k4 = feval(derivative_func, xn + h*k3, derivative_func_args);
+  yn_plus_1 = yn + h/6*(k1 + 2*k2 + 2*k3 + k4);
 end
 
 function references = fill_references_array(vel_ref_struct_arg)
@@ -196,31 +245,28 @@ function horizon_refs = get_vel_horizon_refs(current_pose, waypoints, const_para
 	z=current_pose(3);
 	psi=current_pose(4);
 
-	if (k > length(waypoints))
-			return
-	end
-
 	i=1;
 	for j=k:k+Np-1
-			Rz = [cos(waypoints(j)) sin(waypoints(j)) 0 0; ...
-					 -sin(waypoints(j)) cos(waypoints(j)) 0 0; ...
-					 			0 												0 		1	0; ...
-								0													0			0	1];
-
 			if j > length(waypoints)
 					x_ref = waypoints(1,end);
 					y_ref = waypoints(2,end);
 					z_ref = waypoints(3,end);
 					psi_ref = waypoints(4,end);
+					beta = deg2rad(-90);
 			else
 					x_ref = waypoints(1,j);
 					y_ref = waypoints(2,j);
 					z_ref = waypoints(3,j);
 					psi_ref = waypoints(4,j);
+					beta = atan2(y_ref-y, x_ref-x);  % atan2(yr(k + j|k) - yr(k), xr(k + j|k) − xr(k))
 			end
 
-			beta = atan2(y_ref-y, x_ref-x);  % atan2(yr(k + j|k) - yr(k), xr(k + j|k) − xr(k))
-			temp_vec = [nav_vel*cos(beta) nav_vel*sin(beta) z_ref-z psi_ref-psi]';
+			Rz = [cos(psi_ref) sin(psi_ref) 0 0; ...
+					 -sin(psi_ref) cos(psi_ref) 0 0; ...
+					 	     0 					 0 				1	0; ...
+						     0					 0				0	1];
+
+			temp_vec = [nav_vel*cos(beta) nav_vel*sin(beta) z_ref-z (psi_ref-psi)]';
 			temp_vec = Rz*temp_vec;
 			horizon_refs(i:i+state_vector_size-1,1) = temp_vec;
 			i=i+state_vector_size;
@@ -231,13 +277,13 @@ function waypoints = generate_square_trajectory(square_size, nav_vel, sampling_p
   path_nav_time = (square_size*4)/nav_vel;
   waypoints_qty = ceil((path_nav_time/sampling_period)/4);
 
-  x1 = linspace(0,1, waypoints_qty);
-  theta = zeros(1,length(x1))';
-  y1 = linspace(0,1, waypoints_qty);
+  x1 = linspace(0, 1, waypoints_qty);
+  theta = zeros(1, length(x1))';
+  y1 = linspace(0, 1, waypoints_qty);
   theta = [theta; deg2rad(ones(1,length(y1))*90)'];
   %In the 1x1m square, instead of starting from 1 again, shift to the next
   %element, in this case 0.9970
-  x2 = linspace(x1(end-1),0, waypoints_qty);
+  x2 = linspace(x1(end-1), 0, waypoints_qty);
   theta = [theta; deg2rad(ones(1,length(x2))*180)'];
   y2 = linspace(y1(end-1),0, waypoints_qty);
   theta = [theta; deg2rad(ones(1,length(y2))*270)'];
