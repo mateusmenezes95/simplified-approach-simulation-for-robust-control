@@ -7,6 +7,7 @@ cd(current_script_path)
 % Add paths so that we can use the functions from the files in the lib folder
 addpath(genpath("."))
 addpath(genpath("../functions/matrices_getters"))
+addpath(genpath("../functions/numerical_integration"))
 addpath(genpath("../../lib/mpc_functions"))
 addpath(genpath("../../lib/utils"))
 
@@ -24,7 +25,7 @@ dynamic_model.gravity_vector = [0; 0; 2.5; 0];
 integration_step_ratio = 50;
 integration_step_size = sampling_period/integration_step_ratio;
 
-simulation_time = 25;
+simulation_time = 50;
 end_time = ceil(simulation_time/sampling_period)*sampling_period;
 
 time = 0:integration_step_size:simulation_time;
@@ -46,18 +47,6 @@ figure_idx = 1;
 %==============================================================================
 
 %===================================================================================================
-% Body-fixed velocity references parameters
-%===================================================================================================
-path_step_size = 0.01;
-path.x = 0:path_step_size:1;
-path.x = [path.x ones(1, 99)];
-temp = 0.01:path_step_size:(1-path_step_size);
-path.y = [zeros(1,101) temp];
-%===================================================================================================
-% End of Reference parameters section
-%===================================================================================================
-
-%===================================================================================================
 % MPC Tunning and initialization
 %===================================================================================================
 Aaug = dynamic_model.augmented_state_space.Aaug;
@@ -73,10 +62,9 @@ r = 50;
 params.state_vector_size = state_vector_size;
 params.prediction_horizon = prediction_horizon;
 params.current_time_step = 1;
-params.navigation_velocity = 0.2;
+params.navigation_velocity = 0.1;
 
 waypoints = generate_square_trajectory(1, params.navigation_velocity, sampling_period);
-% horizon_refs = get_vel_horizon_refs(states_value(:, 1), waypoints, params);
 %===================================================================================================
 % End of MPC Tunning and Initialization section
 %===================================================================================================
@@ -155,11 +143,24 @@ generalized_forces = generalized_forces(:, 2:end);
 %===================================================================================================
 % Charts
 %===================================================================================================
-% figure("Name", "bluerov-states")
-% plot_bluerov_states(t, states_value, '-r', line_thickness)
+figure("Name", "bluerov-states")
+plot_bluerov_states(sim_time, body_fixed_vel, '-r', line_thickness)
 
-% figure("Name", "bluerov-control-signals")
-% plot_generalized_forces(t, generalized_forces, -1, '-r', line_thickness)
+figure("Name", "bluerov-control-signals")
+plot_generalized_forces(sim_time, generalized_forces, -1, '-r', line_thickness)
+
+figure("Name", "bluerov-3d-trajectory")
+plot3(position_and_attitude(1,:), ...
+			position_and_attitude(2,:), ...
+			position_and_attitude(3,:), ...
+			'-r', 'linewidth', line_thickness)
+grid on
+
+figure("Name", "bluerov-2d-trajectory")
+plot(position_and_attitude(1,:), ...
+			position_and_attitude(2,:), ...
+			'-r', 'linewidth', line_thickness)
+grid on
 % %===================================================================================================
 % End of charts
 %===================================================================================================
@@ -167,28 +168,6 @@ generalized_forces = generalized_forces(:, 2:end);
 %===================================================================================================
 % Functions used exclusively in this script
 %===================================================================================================
-function body_fixed_vel_dot = nonlinear_map(body_fixed_vel, args)
-	xk = body_fixed_vel;
-	tau = args.tau;
-	dynamic_model = args.dynamic_model;
-	M = dynamic_model.rigid_body_inertia_matrix + dynamic_model.added_mass_system_inertia_matrix;
-	C_RB = get_rigid_body_coriolis_and_centripetal_matrix(xk, dynamic_model.mass);
-	C_A = get_added_mass_coriolis_and_centripetal_matrix(xk, dynamic_model.added_mass_system_inertia_matrix);
-	C = C_RB + C_A;
-	D_v = get_quadratic_damping_matrix(xk, dynamic_model.quadratic_damping_coefficients);
-	D = dynamic_model.linear_damping_matrix + D_v;
-	G = dynamic_model.gravity_vector;
-	body_fixed_vel_dot = M\(tau - C*xk - D*xk - G);
-end
-
-function y = linear_function(xn, args)
-	y = xn;
-end
-
-function y = constant_function(yn, args)
-	y = 1;
-end
-
 function ned_vel = body_fixed_to_inertial_frame(body_fixed_vel, arg)
 	roll = arg.roll;
 	pitch = arg.pitch;
@@ -199,37 +178,6 @@ function ned_vel = body_fixed_to_inertial_frame(body_fixed_vel, arg)
 		0 0 1 0; ...
 		0 0 0 1];
 	ned_vel = body_fixed_to_ned_rot*body_fixed_vel;
-end
-
-% Given y' = f(x) and y(x0) = y0, this function returns y(x)
-function yn_plus_1 = rk4(yn, xn, time_step, derivative_func, derivative_func_args)
-	h = time_step;
-  k1 = feval(derivative_func, xn, derivative_func_args);
-  k2 = feval(derivative_func, xn + h/2*k1, derivative_func_args);
-  k3 = feval(derivative_func, xn + h/2*k2, derivative_func_args);
-  k4 = feval(derivative_func, xn + h*k3, derivative_func_args);
-  yn_plus_1 = yn + h/6*(k1 + 2*k2 + 2*k3 + k4);
-end
-
-function references = fill_references_array(vel_ref_struct_arg)
-  references = zeros(vel_ref_struct_arg.num_states, vel_ref_struct_arg.num_samples);
-	dt = vel_ref_struct_arg.integration_step;
-
-  vel_ref_struct_arg.u.begin_index = vel_ref_struct_arg.u.begin_time/dt;
-	vel_ref_struct_arg.u.end_index = vel_ref_struct_arg.u.end_time/dt;
-	references(1, vel_ref_struct_arg.u.begin_index:vel_ref_struct_arg.u.end_index) = vel_ref_struct_arg.u.value;
-
-	vel_ref_struct_arg.v.begin_index = vel_ref_struct_arg.v.begin_time/dt;
-	vel_ref_struct_arg.v.end_index = vel_ref_struct_arg.v.end_time/dt;
-	references(2, vel_ref_struct_arg.v.begin_index:vel_ref_struct_arg.v.end_index) = vel_ref_struct_arg.v.value;
-
-	vel_ref_struct_arg.w.begin_index = vel_ref_struct_arg.w.begin_time/dt;
-	vel_ref_struct_arg.w.end_index = vel_ref_struct_arg.w.end_time/dt;
-	references(3, vel_ref_struct_arg.w.begin_index:vel_ref_struct_arg.w.end_index) = vel_ref_struct_arg.w.value;
-
-	vel_ref_struct_arg.r.begin_index = vel_ref_struct_arg.r.begin_time/dt;
-	vel_ref_struct_arg.r.end_index = vel_ref_struct_arg.r.end_time/dt;
-	references(4, vel_ref_struct_arg.r.begin_index:vel_ref_struct_arg.r.end_index) = vel_ref_struct_arg.r.value;
 end
 
 function horizon_refs = get_vel_horizon_refs(current_pose, waypoints, const_param)
@@ -266,7 +214,7 @@ function horizon_refs = get_vel_horizon_refs(current_pose, waypoints, const_para
 					 	     0 					 0 				1	0; ...
 						     0					 0				0	1];
 
-			temp_vec = [nav_vel*cos(beta) nav_vel*sin(beta) z_ref-z (psi_ref-psi)]';
+			temp_vec = [nav_vel*cos(beta) nav_vel*sin(beta) 0 (psi_ref-psi)]';
 			temp_vec = Rz*temp_vec;
 			horizon_refs(i:i+state_vector_size-1,1) = temp_vec;
 			i=i+state_vector_size;
