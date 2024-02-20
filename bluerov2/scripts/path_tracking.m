@@ -53,8 +53,8 @@ Aaug = dynamic_model.augmented_state_space.Aaug;
 Baug = dynamic_model.augmented_state_space.Baug;
 Caug = dynamic_model.augmented_state_space.Caug;
 
-q = 350;
-r = 50;
+q = 9500;
+r = 200;
 
 [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
 [kw, kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, q, r, prediction_horizon, control_horizon);
