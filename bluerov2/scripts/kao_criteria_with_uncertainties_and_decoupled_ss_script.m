@@ -13,19 +13,27 @@ addpath(genpath("../functions/matrices_getters"))
 run bluerov2_simulation_parameters
 run bluerov2_models
 
-models = [
-  lower_model, ...
-  upper_model
+degrees_of_freedom = string(["Surge", "Sway", "Heave", "Yaw"]);
+
+uncertainty_mass_or_inertia_vec = [
+  [lower_model.mass, upper_model.mass]; ...               % For surge dof
+  [lower_model.mass, upper_model.mass]; ...               % For sway dof
+  [lower_model.mass, upper_model.mass]; ...               % For heave dof
+  [lower_model.inertia.zz, upper_model.inertia.zz]; ...   % For yaw dof
 ];
 
-uncertainty_mass_vec = [
-  lower_model.mass, ...
-  upper_model.mass
+uncertainty_linear_damping_vec = [
+  [lower_model.linear_damping_coefficients.x_u, upper_model.linear_damping_coefficients.x_u]; ...  % For surge dof
+  [lower_model.linear_damping_coefficients.y_v, upper_model.linear_damping_coefficients.y_v]; ...  % For sway dof
+  [lower_model.linear_damping_coefficients.z_w, upper_model.linear_damping_coefficients.z_w]; ...  % For heave dof
+  [lower_model.linear_damping_coefficients.n_r, upper_model.linear_damping_coefficients.n_r]; ...  % For yaw dof
 ];
 
-uncertainty_inertia_vec = [
-  lower_model.inertia.zz, ...
-  upper_model.inertia.zz
+uncertainty_added_mass_vec = [
+  [lower_model.added_mass_coeficcients.x_dot_u, upper_model.added_mass_coeficcients.x_dot_u]; ...  % For surge dof
+  [lower_model.added_mass_coeficcients.y_dot_v, upper_model.added_mass_coeficcients.y_dot_v]; ...  % For sway dof
+  [lower_model.added_mass_coeficcients.z_dot_w, upper_model.added_mass_coeficcients.z_dot_w]; ...  % For heave dof
+  [lower_model.added_mass_coeficcients.n_dot_r, upper_model.added_mass_coeficcients.n_dot_r]; ...  % For yaw dof
 ];
 
 % =============================================================================
@@ -35,6 +43,7 @@ uncertainty_inertia_vec = [
 amount_of_outputs = 1;
 amount_of_inputs = 1;
 amount_of_states = 1;
+amount_of_decoupled_states = size(uncertainty_mass_or_inertia_vec, 1);
 
 % =============================================================================
 % Solver options
@@ -50,123 +59,124 @@ opt.allownonconvex = 0;
 % MPC tunning
 % =============================================================================
 
-q = 9111:9:10000;
+q = 7111:9:8000;
 r = 200;
 
-lmi_norm_with_uncertainty_vec = zeros(size(q));
-lmi_nmax_with_uncertainty_vec = zeros(size(q));
+lmi_norm_with_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
+lmi_nmax_with_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
 
-lmi_norm_without_uncertainty_vec = zeros(size(q));
-lmi_nmax_without_uncertainty_vec = zeros(size(q));
+lmi_norm_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
+lmi_nmax_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
 
-matlab_norm_without_uncertainty_vec = zeros(size(q));
-matlab_nmax_without_uncertainty_vec = zeros(size(q));
+matlab_norm_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
+matlab_nmax_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
 
-matlab_vertex_norm_vec = [zeros(size(q)); zeros(size(q))]';
+for ss_num = 1:amount_of_decoupled_states
+  print_section_description("Processing DoF: " + degrees_of_freedom(ss_num))
 
-waitbar_fig = waitbar(0, 'Starting LMI computation...');
+  waitbar_fig = waitbar(0, 'Starting LMI computation...');
+  loop_index= 1;
+  for q_sample = q
+      waitbar((loop_index/size(q,2)), waitbar_fig, ...
+              sprintf('Computing H infinity norm for q = %d', q_sample));
+      ineqs=[];
+      Gd = [];
+      Gd = sdpvar(3, 3, 'full');
+      mu = 0;
+      mu = sdpvar(1);
+      for i = 1:size(uncertainty_mass_or_inertia_vec, 2)
+        for j = 1:size(uncertainty_linear_damping_vec, 2)
+          for k = 1:size(uncertainty_added_mass_vec, 2)
+            mass_or_inertia = uncertainty_mass_or_inertia_vec(ss_num, i);
+            linear_damping = uncertainty_linear_damping_vec(ss_num, j);
+            added_mass = uncertainty_added_mass_vec(ss_num, k);
+            [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices_with_decoupled_ss(...
+                                                        mass_or_inertia, ...
+                                                        linear_damping, ...
+                                                        added_mass, ...
+                                                        sampling_period, prediction_horizon, ...
+                                                        control_horizon, r, q_sample);
+            % Augmented system size
+            n = size(Almi,1);
+            Pd = sdpvar(n);
 
-which_state = "u_dot";
+            ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs); ...
+                            Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
+                            Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
+                            zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
+          end % end for k loop
+        end % end for j loop
+      end % end for i loop
+    
+      objective = mu;
+      yalmipdiagnostics = optimize(ineqs, objective, opts);
+      mu = value(objective);
+      fprintf("Yalmip info for q=%d, r=%d: %s\n", q_sample, r, yalmipdiagnostics.info)
 
-loop_index= 1;
-for q_sample = q
-    waitbar((loop_index/size(q,2)), waitbar_fig, ...
-            sprintf('Computing H infinity norm for q = %d', q_sample));
-    ineqs=[];
-    Gd = [];
-    Gd = sdpvar(3, 3, 'full');
-    mu = 0;
-    mu = sdpvar(1);
-    for i = 1:size(uncertainty_mass_vec, 2)
-      for k = 1:size(models, 2)
-        for l = 1:size(models, 2)
-          mass = uncertainty_mass_vec(i);
-          x_u = models(k).linear_damping_coefficients.x_u;
-          x_dot_u = models(l).added_mass_coeficcients.x_dot_u;
-          [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices_with_decoupled_ss(mass, x_u, x_dot_u, ...
-                                                      sampling_period, prediction_horizon, ...
-                                                      control_horizon, ...
-                                                      r, q_sample);
-          % Augmented system size
-          n = size(Almi,1);
-          Pd = sdpvar(n);
+      lmi_norm_with_uncertainty = sqrt(mu);
+      lmi_norm_with_uncertainty_vec(ss_num, loop_index) = lmi_norm_with_uncertainty;
 
-          ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs); ...
-                          Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
-                          Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
-                          zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
-        end % end for l loop
-      end % end for k loop
-    end % end for i loop
-  
-    objective = mu;
-    yalmipdiagnostics = optimize(ineqs, objective, opts);
-    mu = value(objective);
-    fprintf("Yalmip info for q=%d, r=%d: %s\n", q_sample, r, yalmipdiagnostics.info)
+      [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices_with_decoupled_ss(nominal_model.mass,...
+                                                                    nominal_model.linear_damping_coefficients.x_u, ...
+                                                                    nominal_model.added_mass_coeficcients.x_dot_u, ...
+                                                                    sampling_period, ...
+                                                                    prediction_horizon, control_horizon, ...
+                                                                    r, q_sample);
+      Pd = [];
+      Pd = sdpvar(n);
+      Gd = [];
+      Gd = sdpvar(n, n, 'full');
+      mu = 0;
+      mu = sdpvar(1);
+      ineqs=[];
+      ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs); ...
+                      Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
+                      Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
+                      zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
 
-    lmi_norm_with_uncertainty = sqrt(mu);
-    lmi_norm_with_uncertainty_vec(loop_index) = lmi_norm_with_uncertainty;
+      objective = mu;
+      yalmipdiagnostics = optimize(ineqs, objective, opts);
+      mu = value(objective);
 
-    [Almi, Blmi, Clmi, Dlmi] = get_lmi_matrices_with_decoupled_ss(nominal_model.mass,...
-                                                                  nominal_model.linear_damping_coefficients.x_u, ...
-                                                                  nominal_model.added_mass_coeficcients.x_dot_u, ...
-                                                                  sampling_period, ...
-                                                                  prediction_horizon, control_horizon, ...
-                                                                  r, q_sample);
-    Pd = [];
-    Pd = sdpvar(n);
-    Gd = [];
-    Gd = sdpvar(n, n, 'full');
-    mu = 0;
-    mu = sdpvar(1);
-    ineqs=[];
-    ineqs = [ineqs,[Pd Almi*Gd Blmi zeros(n, amount_of_inputs); ...
-                    Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
-                    Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
-                    zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
+      lmi_norm_without_uncertainty = sqrt(mu);
+      lmi_norm_without_uncertainty_vec(ss_num, loop_index) = lmi_norm_without_uncertainty;
 
-    objective = mu;
-    yalmipdiagnostics = optimize(ineqs, objective, opts);
-    mu = value(objective);
+      closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
+      matlab_norm_without_uncertainty = norm(closed_loop_ss, inf);
+      matlab_norm_without_uncertainty_vec(ss_num, loop_index) = matlab_norm_without_uncertainty;
 
-    lmi_norm_without_uncertainty = sqrt(mu);
-    lmi_norm_without_uncertainty_vec(loop_index) = lmi_norm_without_uncertainty;
+      lmi_nmax_with_uncertainty_vec(ss_num, loop_index) = get_maximum_delay(lmi_norm_with_uncertainty);
+      matlab_nmax_without_uncertainty_vec(ss_num, loop_index) = get_maximum_delay(matlab_norm_without_uncertainty);
 
-    closed_loop_ss = ss(Almi, Blmi, Clmi, Dlmi, -1);
-    matlab_norm_without_uncertainty = norm(closed_loop_ss, inf);
-    matlab_norm_without_uncertainty_vec(loop_index) = matlab_norm_without_uncertainty;
+      loop_index = loop_index + 1;
+  end
 
-    lmi_nmax_with_uncertainty_vec(loop_index) = get_maximum_delay(lmi_norm_with_uncertainty);
-    matlab_nmax_without_uncertainty_vec(loop_index) = get_maximum_delay(matlab_norm_without_uncertainty);
+  % =============================================================================
+  if ss_num == 1
+    figure1 = figure("Name", "Norms by LMI");
+  else
+    figure(figure1.Number)
+  end
+  % =============================================================================
+  subplot(2,2,ss_num)
+  plot_overlapping_norms(q, 90, lmi_norm_with_uncertainty_vec(ss_num, :), ...
+                        matlab_norm_without_uncertainty_vec(ss_num, :), ...
+                        {'With uncertainty', 'Without uncertainty'})
+  % =============================================================================
+  if ss_num == 1
+    figure2 = figure("Name", "Maximum delay allowed by LMI and Matlab");
+  else
+    figure(figure2.Number)
+  end
+  % =============================================================================
+  subplot(2,2,ss_num)
+  plot_overlapping_nmax(q, 90, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
+                        lmi_nmax_with_uncertainty_vec(ss_num, :), ...
+                        "", {'Without uncertainty', 'With uncertainty'})
+  % =============================================================================
 
-    loop_index = loop_index + 1;
+  close(waitbar_fig)
 end
-
-close(waitbar_fig)
-
-% =============================================================================
-figure1 = figure("Name", "Norms by LMI");
-% =============================================================================
-
-axes1 = axes('Parent',figure1,...
-    'Position',[0.101785714285714 0.102380952380952 0.869642857142857 0.876190476190477]);
-hold(axes1,'on');
-
-plot_overlapping_norms(q, 90, lmi_norm_with_uncertainty_vec, ...
-                       matlab_norm_without_uncertainty_vec, ...
-                       {'With uncertainty', 'Without uncertainty'})
-
-% =============================================================================
-figure2 = figure("Name", "Maximum delay allowed by LMI and Matlab");
-% =============================================================================
-
-axes1 = axes('Parent',figure2,...
-    'Position',[0.0736842105263158 0.113801452784504 0.889473684210526 0.864406779661017]);
-hold(axes1,'on');
-
-plot_overlapping_nmax(q, 90, matlab_nmax_without_uncertainty_vec, ...
-                      lmi_nmax_with_uncertainty_vec, ...
-                      "", {'Without uncertainty', 'With uncertainty'})
 
 function max_delay = get_maximum_delay(norm)
   max_delay = 0;
