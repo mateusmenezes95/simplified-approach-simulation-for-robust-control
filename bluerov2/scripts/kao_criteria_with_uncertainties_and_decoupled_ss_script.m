@@ -59,25 +59,36 @@ opt.allownonconvex = 0;
 % MPC tunning
 % =============================================================================
 
-q = 7111:9:8000;
-r = 200;
+q_per_state = [
+  7111:9:8000; ...  % For surge dof
+  7111:9:8000; ...  % For sway dof
+  7111:9:8000; ...  % For heave dof
+  1111:9:2000; ...  % For yaw dof
+];
 
-lmi_norm_with_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
-lmi_nmax_with_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
+r_per_state = [
+  200; ...  % For surge dof
+  200; ...  % For sway dof
+  200; ...  % For heave dof
+  200; ...  % For yaw dof
+];
 
-lmi_norm_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
-lmi_nmax_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
+lmi_norm_with_uncertainty_vec = zeros(amount_of_decoupled_states, size(q_per_state(1,:), 2));
+lmi_nmax_with_uncertainty_vec = zeros(amount_of_decoupled_states, size(q_per_state(1,:), 2));
 
-matlab_norm_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
-matlab_nmax_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q, 2));
+lmi_norm_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q_per_state(1,:), 2));
+lmi_nmax_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q_per_state(1,:), 2));
+
+matlab_norm_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q_per_state(1,:), 2));
+matlab_nmax_without_uncertainty_vec = zeros(amount_of_decoupled_states, size(q_per_state(1,:), 2));
 
 for ss_num = 1:amount_of_decoupled_states
   print_section_description("Processing DoF: " + degrees_of_freedom(ss_num))
 
   waitbar_fig = waitbar(0, 'Starting LMI computation...');
   loop_index= 1;
-  for q_sample = q
-      waitbar((loop_index/size(q,2)), waitbar_fig, ...
+  for q_sample = q_per_state(ss_num, :)
+      waitbar((loop_index/size(q_per_state(ss_num,:), 2)), waitbar_fig, ...
               sprintf('Computing H infinity norm for q = %d', q_sample));
       ineqs=[];
       Gd = [];
@@ -95,7 +106,7 @@ for ss_num = 1:amount_of_decoupled_states
                                                         linear_damping, ...
                                                         added_mass, ...
                                                         sampling_period, prediction_horizon, ...
-                                                        control_horizon, r, q_sample);
+                                                        control_horizon, r_per_state(ss_num), q_sample);
             % Augmented system size
             n = size(Almi,1);
             Pd = sdpvar(n);
@@ -111,7 +122,7 @@ for ss_num = 1:amount_of_decoupled_states
       objective = mu;
       yalmipdiagnostics = optimize(ineqs, objective, opts);
       mu = value(objective);
-      fprintf("Yalmip info for q=%d, r=%d: %s\n", q_sample, r, yalmipdiagnostics.info)
+      fprintf("Yalmip info for q=%d, r=%d: %s\n", q_sample, r_per_state(ss_num), yalmipdiagnostics.info)
 
       lmi_norm_with_uncertainty = sqrt(mu);
       lmi_norm_with_uncertainty_vec(ss_num, loop_index) = lmi_norm_with_uncertainty;
@@ -121,7 +132,7 @@ for ss_num = 1:amount_of_decoupled_states
                                                                     nominal_model.added_mass_coeficcients.x_dot_u, ...
                                                                     sampling_period, ...
                                                                     prediction_horizon, control_horizon, ...
-                                                                    r, q_sample);
+                                                                    r_per_state(ss_num), q_sample);
       Pd = [];
       Pd = sdpvar(n);
       Gd = [];
@@ -159,7 +170,7 @@ for ss_num = 1:amount_of_decoupled_states
   end
   % =============================================================================
   subplot(2,2,ss_num)
-  plot_overlapping_norms(q, 90, lmi_norm_with_uncertainty_vec(ss_num, :), ...
+  plot_overlapping_norms(q_per_state(ss_num, :), 90, lmi_norm_with_uncertainty_vec(ss_num, :), ...
                         matlab_norm_without_uncertainty_vec(ss_num, :), ...
                         {'With uncertainty', 'Without uncertainty'})
   % =============================================================================
@@ -170,7 +181,7 @@ for ss_num = 1:amount_of_decoupled_states
   end
   % =============================================================================
   subplot(2,2,ss_num)
-  plot_overlapping_nmax(q, 90, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
+  plot_overlapping_nmax(q_per_state(ss_num, :), 90, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
                         lmi_nmax_with_uncertainty_vec(ss_num, :), ...
                         "", {'Without uncertainty', 'With uncertainty'})
   % =============================================================================

@@ -53,11 +53,23 @@ Aaug = dynamic_model.augmented_state_space.Aaug;
 Baug = dynamic_model.augmented_state_space.Baug;
 Caug = dynamic_model.augmented_state_space.Caug;
 
-q = 9500;
-r = 200;
+surge.q = 8000;
+surge.r = 500;
+
+sway.q = 7200;
+sway.r = 450;
+
+heave.q = 7500;
+heave.r = 200;
+
+yaw.q = 111;
+yaw.r = 200;
+
+q = diag([surge.q, sway.q, heave.q, yaw.q]);
+r = diag([surge.r, sway.r, heave.r, yaw.r]);
 
 [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
-[kw, kmpc, Q, R] = get_mpc_gains(Acal, Bcal, Ccal, q, r, prediction_horizon, control_horizon);
+[kw, kmpc, Q, R] = get_mpc_gains_non_scalar_qr(Acal, Bcal, Ccal, q, r, prediction_horizon, control_horizon);
 
 params.state_vector_size = state_vector_size;
 params.prediction_horizon = prediction_horizon;
@@ -155,6 +167,7 @@ plot3(position_and_attitude(1,:), ...
 			position_and_attitude(3,:), ...
 			'-r', 'linewidth', line_thickness)
 grid on
+zlim([-5 5])
 
 figure("Name", "bluerov-2d-trajectory")
 plot(position_and_attitude(1,:), ...
