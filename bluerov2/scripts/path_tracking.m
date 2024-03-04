@@ -33,6 +33,7 @@ num_of_simulation_steps = length(time);
 sim_time = zeros(1, num_of_simulation_steps);
 
 num_of_samples = ceil(simulation_time/sampling_period);
+samples_delayed = 11;
 %===================================================================================================
 % End of simulation parameters section
 %===================================================================================================
@@ -54,15 +55,15 @@ Baug = dynamic_model.augmented_state_space.Baug;
 Caug = dynamic_model.augmented_state_space.Caug;
 
 surge.q = 8000;
-surge.r = 500;
+surge.r = 200;
 
 sway.q = 7200;
-sway.r = 450;
+sway.r = 200;
 
 heave.q = 7500;
 heave.r = 200;
 
-yaw.q = 111;
+yaw.q = 1500;
 yaw.r = 200;
 
 q = diag([surge.q, sway.q, heave.q, yaw.q]);
@@ -86,6 +87,7 @@ waypoints = generate_square_trajectory(1, params.navigation_velocity, sampling_p
 %===================================================================================================
 body_fixed_vel = zeros(state_vector_size, num_of_simulation_steps+1);  % v(:, 1) = [0; 0; 0; 0] -> Initial condition
 body_fixed_vel_sampled = zeros(state_vector_size, num_of_samples+1);
+control_signal = zeros(state_vector_size, num_of_samples+1);
 
 position_and_attitude = zeros(state_vector_size, num_of_simulation_steps+1);
 position_and_attitude_sampled = zeros(state_vector_size, num_of_samples+1);
@@ -126,12 +128,22 @@ for i=1:num_of_simulation_steps
 		ksi = [delta_xk; body_fixed_vel_sampled(:, k)];    % In this case, y[k] is the state vector due to C = I
 		delta_u = kw*horizon_refs - kmpc*ksi;
 	
-		control_signal = delta_u(1:state_vector_size,1) + control_signal;
+		if (k > 1)
+			control_signal(:, k) = delta_u(1:state_vector_size,1) + control_signal(:, k-1);
+		else
+			control_signal(:, k) = delta_u(1:state_vector_size,1);
+		end
+
 		k = k + 1;
 	end
 
-	generalized_forces(:, i) = control_signal;
-	non_linear_map_args.tau = control_signal;
+	if (k > samples_delayed + 1)
+		generalized_forces(:, i) = control_signal(:, k - samples_delayed - 1);
+	else 
+		generalized_forces(:, i) = control_signal(:, 1);
+	end
+
+	non_linear_map_args.tau = generalized_forces(:, i);
 
 	body_fixed_vel(:, i+1) = rk4(body_fixed_vel(:, i), body_fixed_vel(:, i), ...
 															 integration_step_size, @nonlinear_map, non_linear_map_args);
