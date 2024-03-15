@@ -294,9 +294,18 @@ nominal_model.rigid_body_inertia_matrix = get_rigid_body_inertia_matrix(nominal_
 nominal_model.added_mass_system_inertia_matrix = get_added_mass_system_inertia_matrix(nominal_model);
 nominal_model.linear_damping_matrix = get_linear_damping_matrix(nominal_model);
 
-[discrete_state_space, augmented_state_space] = get_state_space_matrix(nominal_model, sampling_period, nominal_model.name);
+[continuous_ss, discrete_state_space, augmented_state_space] = get_state_space_matrix(nominal_model, ...
+                                                                                      sampling_period, ... 
+                                                                                      nominal_model.name);
 nominal_model.discrete_state_space = discrete_state_space;
 nominal_model.augmented_state_space = augmented_state_space;
+nominal_model.continuous_state_space = continuous_ss;
+
+s = tf('s');
+nominal_model.tf.G_x_to_u = nominal_model.continuous_state_space.B(1,1)/(s - nominal_model.continuous_state_space.A(1,1));
+nominal_model.tf.G_y_to_v = nominal_model.continuous_state_space.B(2,2)/(s - nominal_model.continuous_state_space.A(2,2));
+nominal_model.tf.G_z_to_w = nominal_model.continuous_state_space.B(3,3)/(s - nominal_model.continuous_state_space.A(3,3));
+nominal_model.tf.G_n_to_r = nominal_model.continuous_state_space.B(4,4)/(s - nominal_model.continuous_state_space.A(4,4));
 
 nominal_model.color = "m";
 
@@ -339,7 +348,7 @@ function D = get_linear_damping_matrix(dynamic_model_parameter)
   ]);
 end
 
-function [discrete_state_space, augmented_state_space] = get_state_space_matrix(fossen_model, sampling_period, model_name)
+function [continuous_ss, discrete_ss, augmented_ss] = get_state_space_matrix(fossen_model, sampling_period, model_name)
   system_inertia_matrix = fossen_model.rigid_body_inertia_matrix + fossen_model.added_mass_system_inertia_matrix;
 
   states = {'u', 'v', 'w', 'r'};
@@ -353,27 +362,28 @@ function [discrete_state_space, augmented_state_space] = get_state_space_matrix(
                             'StateName', states, 'OutputName', states, ...
                             'Name', model_name);
 
+  continuous_ss = robot_continous_model;
   robot_discrete_model = c2d(robot_continous_model, sampling_period);
 
   Ad = robot_discrete_model.A;
   Bd = robot_discrete_model.B;
   Cd = robot_discrete_model.C;
 
-  discrete_state_space.Ad = Ad;
-  discrete_state_space.Bd = Bd;
-  discrete_state_space.Cd = Cd;
+  discrete_ss.Ad = Ad;
+  discrete_ss.Bd = Bd;
+  discrete_ss.Cd = Cd;
 
-  augmented_state_space.Aaug = ...
+  augmented_ss.Aaug = ...
   [
     Ad    zeros(size(Ad));
     Cd*Ad eye(size(Cd,1),size(Ad,2))
   ];
 
-  augmented_state_space.Baug = ...
+  augmented_ss.Baug = ...
   [
     Bd;
     Cd*Bd
   ];
 
-  augmented_state_space.Caug = [zeros(state_vector_size) eye(state_vector_size)];
+  augmented_ss.Caug = [zeros(state_vector_size) eye(state_vector_size)];
 end

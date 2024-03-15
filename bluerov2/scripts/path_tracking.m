@@ -1,5 +1,5 @@
 clc
-clear all
+clear
 
 current_script_path = fileparts(mfilename('fullpath'));
 cd(current_script_path)
