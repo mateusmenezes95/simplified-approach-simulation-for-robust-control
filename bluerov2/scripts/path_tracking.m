@@ -14,6 +14,7 @@ addpath(genpath("../../lib/utils"))
 % Run some scripts to load the simulation parameters
 run bluerov2_simulation_parameters
 run bluerov2_models
+run trajectory_generation
 
 %===================================================================================================
 % Simulation parameters
@@ -25,7 +26,7 @@ dynamic_model.gravity_vector = [0; 0; 2.5; 0];
 integration_step_ratio = 50;
 integration_step_size = sampling_period/integration_step_ratio;
 
-simulation_time = 50;
+simulation_time = 40;
 end_time = ceil(simulation_time/sampling_period)*sampling_period;
 
 time = 0:integration_step_size:simulation_time;
@@ -33,7 +34,7 @@ num_of_simulation_steps = length(time);
 sim_time = zeros(1, num_of_simulation_steps);
 
 num_of_samples = ceil(simulation_time/sampling_period);
-samples_delayed = 11;
+samples_delayed = 4;
 %===================================================================================================
 % End of simulation parameters section
 %===================================================================================================
@@ -57,7 +58,7 @@ Caug = dynamic_model.augmented_state_space.Caug;
 surge.q = 8000;
 surge.r = 200;
 
-sway.q = 7200;
+sway.q = 9000;
 sway.r = 200;
 
 heave.q = 7500;
@@ -78,6 +79,7 @@ params.current_time_step = 1;
 params.navigation_velocity = 0.1;
 
 waypoints = generate_square_trajectory(1, params.navigation_velocity, sampling_period);
+vel_ref = [x_dot_rotated'; y_dot_rotated'; z_dot'; psi_dot'];
 %===================================================================================================
 % End of MPC Tunning and Initialization section
 %===================================================================================================
@@ -115,7 +117,7 @@ for i=1:num_of_simulation_steps
 
 	% Sample instant
 	if (mod(i, integration_step_ratio) == 1 || i == 1)
-		horizon_refs = get_vel_horizon_refs(position_and_attitude(:, i), waypoints, params);
+		horizon_refs = generate_horizon_vel_ref(vel_ref, params);;
 		horizon_ref(1:state_vector_size, k) = horizon_refs(1:state_vector_size);
 		params.current_time_step = params.current_time_step + 1;
 
@@ -242,6 +244,25 @@ function horizon_refs = get_vel_horizon_refs(current_pose, waypoints, const_para
 			temp_vec = [nav_vel*cos(beta) nav_vel*sin(beta) 0 (psi_ref-psi)]';
 			temp_vec = Rz*temp_vec;
 			horizon_refs(i:i+state_vector_size-1,1) = temp_vec;
+			i=i+state_vector_size;
+	end
+end
+
+function horizon_vel_ref = generate_horizon_vel_ref(vel_trajectory, const_param)
+	state_vector_size = const_param.state_vector_size;
+	k = const_param.current_time_step;
+	Np = const_param.prediction_horizon;
+
+	horizon_vel_ref = zeros(Np*state_vector_size,1);
+
+	i=1;
+	for j=k:k+Np-1
+			if j > length(vel_trajectory)
+				temp_vec = [vel_trajectory(1,end); vel_trajectory(2,end); vel_trajectory(3,end); vel_trajectory(4,end)];
+			else
+				temp_vec = [vel_trajectory(1,j); vel_trajectory(2,j); vel_trajectory(3,j); vel_trajectory(4,j)];
+			end
+			horizon_vel_ref(i:i+state_vector_size-1,1) = temp_vec;
 			i=i+state_vector_size;
 	end
 end
