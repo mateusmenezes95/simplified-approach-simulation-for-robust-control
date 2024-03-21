@@ -26,7 +26,7 @@ dynamic_model.gravity_vector = [0; 0; 2.5; 0];
 integration_step_ratio = 50;
 integration_step_size = sampling_period/integration_step_ratio;
 
-simulation_time = 40;
+simulation_time = 41.5;
 end_time = ceil(simulation_time/sampling_period)*sampling_period;
 
 time = 0:integration_step_size:simulation_time;
@@ -34,7 +34,7 @@ num_of_simulation_steps = length(time);
 sim_time = zeros(1, num_of_simulation_steps);
 
 num_of_samples = ceil(simulation_time/sampling_period);
-samples_delayed = 4;
+samples_delayed = 0;
 %===================================================================================================
 % End of simulation parameters section
 %===================================================================================================

@@ -14,7 +14,7 @@ run bluerov2_models
 % Reference model for trajectory generation section
 % According to Fossen 2021, p. 337, section 12.1.1 References Models for Trajectory Generation
 % The reference model is given by the following transfer function:
-%  																wn^3	
+%  							wn^3	
 % H(s) = -----------------------------------------------------
 %        s^3 + (2*ksi + 1)*wn*s^2 + (2*ksi + 1)*wn^2*s + wn^3
 % Which is second order system cascaded with a first order system
@@ -22,13 +22,16 @@ run bluerov2_models
 %===================================================================================================
 state_vector_size = size(nominal_model.discrete_state_space.Ad, 1);
 
-bandwidth_reduction_factor = 0.9;
+bandwidth_reduction_factor.G_x_to_u = 2.0;
+bandwidth_reduction_factor.G_y_to_v = 5.0;
+bandwidth_reduction_factor.G_z_to_w = 1.0;
+bandwidth_reduction_factor.G_n_to_r = 1.0;
 ksi = 1/sqrt(2);
 
-nominal_model.G_x_to_u.wn = bandwidth(nominal_model.tf.G_x_to_u)*bandwidth_reduction_factor;
-nominal_model.G_y_to_v.wn = bandwidth(nominal_model.tf.G_y_to_v)*3;
-nominal_model.G_z_to_w.wn = bandwidth(nominal_model.tf.G_z_to_w)*bandwidth_reduction_factor;
-nominal_model.G_n_to_r.wn = bandwidth(nominal_model.tf.G_n_to_r)*bandwidth_reduction_factor;
+nominal_model.G_x_to_u.wn = bandwidth(nominal_model.tf.G_x_to_u)*bandwidth_reduction_factor.G_x_to_u;
+nominal_model.G_y_to_v.wn = bandwidth(nominal_model.tf.G_y_to_v)*bandwidth_reduction_factor.G_y_to_v;
+nominal_model.G_z_to_w.wn = bandwidth(nominal_model.tf.G_z_to_w)*bandwidth_reduction_factor.G_z_to_w;
+nominal_model.G_n_to_r.wn = bandwidth(nominal_model.tf.G_n_to_r)*bandwidth_reduction_factor.G_n_to_r;
 
 [nominal_model.pos_ref_tf.x, nominal_model.vel_ref_tf.x] = getDiscreteRefenceModelTf(ksi, nominal_model.G_x_to_u.wn, sampling_period);
 [nominal_model.pos_ref_tf.y, nominal_model.vel_ref_tf.y] = getDiscreteRefenceModelTf(ksi, nominal_model.G_y_to_v.wn, sampling_period);
@@ -83,10 +86,11 @@ plot_states(t, psi, psi_dot, '\psi', '\dot{\psi}');
 
 x_dot_rotated = zeros(size(x_dot));
 y_dot_rotated = zeros(size(y_dot));
+psi_filtered = lsim(nominal_model.pos_ref_tf.psi, psi, t);
 
 for i = 1:length(x_dot)
-	x_dot_rotated(i) = (x_dot(i) * cos(-psi(i))) - (y_dot(i) * sin(-psi(i)));
-	y_dot_rotated(i) = (x_dot(i) * sin(-psi(i))) + (y_dot(i) * cos(-psi(i)));
+	x_dot_rotated(i) = (x_dot(i) * cos(-psi_filtered(i))) - (y_dot(i) * sin(-psi_filtered(i)));
+	y_dot_rotated(i) = (x_dot(i) * sin(-psi_filtered(i))) + (y_dot(i) * cos(-psi_filtered(i)));
 end
 
 figure
