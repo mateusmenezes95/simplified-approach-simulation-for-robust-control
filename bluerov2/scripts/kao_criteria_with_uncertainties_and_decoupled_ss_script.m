@@ -60,11 +60,13 @@ opt.allownonconvex = 0;
 % =============================================================================
 
 q_per_state = [
-  linspace(3000, 4000, 99); ...  % For surge dof
-  linspace(3000, 4000, 99); ...  % For sway dof
-  linspace(3000, 4000, 99); ...  % For heave dof
-  linspace(1000, 2000, 99); ...  % For yaw dof
+  create_array(100, 7000, 100);  % For surge dof
+  create_array(100, 7000, 100);  % For sway dof
+  create_array(100, 7000, 100);  % For heave dof
+  create_array(100, 7000, 100);   % For yaw dof
 ];
+
+q_per_state_step_size = q_per_state(1, 2) - q_per_state(1, 1);
 
 r_per_state = [
   200; ...  % For surge dof
@@ -170,7 +172,7 @@ for ss_num = 1:amount_of_decoupled_states
   end
   % =============================================================================
   subplot(2,2,ss_num)
-  plot_overlapping_norms(q_per_state(ss_num, :), 90, lmi_norm_with_uncertainty_vec(ss_num, :), ...
+  plot_overlapping_norms(q_per_state(ss_num, :), q_per_state_step_size, lmi_norm_with_uncertainty_vec(ss_num, :), ...
                         matlab_norm_without_uncertainty_vec(ss_num, :), ...
                         {'With uncertainty', 'Without uncertainty'})
   % =============================================================================
@@ -181,7 +183,7 @@ for ss_num = 1:amount_of_decoupled_states
   end
   % =============================================================================
   subplot(2,2,ss_num)
-  plot_overlapping_nmax(q_per_state(ss_num, :), 90, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
+  plot_overlapping_nmax(q_per_state(ss_num, :), q_per_state_step_size, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
                         lmi_nmax_with_uncertainty_vec(ss_num, :), ...
                         "", {'Without uncertainty', 'With uncertainty'})
   % =============================================================================
@@ -194,4 +196,9 @@ function max_delay = get_maximum_delay(norm)
   if norm < 1
     max_delay = floor(1/norm);
   end
+end
+
+function arr = create_array(min_val, max_val, step_size)
+  num_points = (max_val - min_val) / step_size + 1;
+  arr = linspace(min_val, max_val, num_points);
 end
