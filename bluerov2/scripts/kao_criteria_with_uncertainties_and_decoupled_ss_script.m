@@ -60,10 +60,10 @@ opt.allownonconvex = 0;
 % =============================================================================
 
 q_per_state = [
-  7111:9:8000; ...  % For surge dof
-  7111:9:8000; ...  % For sway dof
-  7111:9:8000; ...  % For heave dof
-  1111:9:2000; ...  % For yaw dof
+  linspace(3000, 4000, 99); ...  % For surge dof
+  linspace(3000, 4000, 99); ...  % For sway dof
+  linspace(3000, 4000, 99); ...  % For heave dof
+  linspace(1000, 2000, 99); ...  % For yaw dof
 ];
 
 r_per_state = [
