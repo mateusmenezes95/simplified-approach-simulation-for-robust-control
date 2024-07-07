@@ -20,6 +20,14 @@ pwm_output_values = readmatrix('../datalogs/tests-on_04-23-2024/analysis-interva
 ekf_output_values = readmatrix('../datalogs/tests-on_04-23-2024/analysis-interval-01/xkf1-data.csv');
 
 time_index = 2;
+
+% Indices for the PWM output values for the horizontal thrusters
+thruster_index.horizontal.front_right = 3;
+thruster_index.horizontal.front_left = 4;
+thruster_index.horizontal.rear_right = 5;
+thruster_index.horizontal.rear_left = 6;
+
+% Indices for the PWM output values for the vertical thrusters
 thruster_index.vertical.right = 7;
 thruster_index.vertical.left = 8;
 
@@ -27,12 +35,24 @@ velocity_index.north = 7;
 velocity_index.east = 8;
 velocity_index.down = 9;
 
+ned_position_index.down = 13;
+
 orientation_index.roll = 4;
 orientation_index.pitch = 5;
 orientation_index.yaw = 6;
 
 time_epochs = pwm_output_values(:, time_index);
 time_from_start = (time_epochs - time_epochs(1))/1e6;
+
+horizontal_thruster_pwm_val.front_right = pwm_output_values(:, thruster_index.horizontal.front_right);
+horizontal_thruster_pwm_val.front_left = pwm_output_values(:, thruster_index.horizontal.front_left);
+horizontal_thruster_pwm_val.rear_right = pwm_output_values(:, thruster_index.horizontal.rear_right);
+horizontal_thruster_pwm_val.rear_left = pwm_output_values(:, thruster_index.horizontal.rear_left);
+
+horizontal_thruster_thrust_val.front_right = pwm_to_thrust(horizontal_thruster_pwm_val.front_right, "ccw");
+horizontal_thruster_thrust_val.front_left = pwm_to_thrust(horizontal_thruster_pwm_val.front_left, "ccw");
+horizontal_thruster_thrust_val.rear_right = pwm_to_thrust(horizontal_thruster_pwm_val.rear_right, "cw");
+horizontal_thruster_thrust_val.rear_left = pwm_to_thrust(horizontal_thruster_pwm_val.rear_left, "cw");
 
 vertical_thruster_pwm_val.right = pwm_output_values(:, thruster_index.vertical.right);
 vertical_thruster_pwm_val.left = pwm_output_values(:, thruster_index.vertical.left);
@@ -45,6 +65,8 @@ total_vertical_thrust = vertical_thruster_thrust_val.right + vertical_thruster_t
 velocity.north = ekf_output_values(:, velocity_index.north);
 velocity.east = ekf_output_values(:, velocity_index.east);
 velocity.down = ekf_output_values(:, velocity_index.down);
+
+depth = ekf_output_values(:, ned_position_index.down);
 
 orientation.roll = ekf_output_values(:, orientation_index.roll);
 orientation.pitch = ekf_output_values(:, orientation_index.pitch);
@@ -79,10 +101,34 @@ end
 % TODO(mateusmenzes95): Fix this in the model
 body_fixed_vel_model = -body_fixed_vel_model(2:end, :);
 
-figure(1)
+body_vel.u = body_fixed_vel(:, 1);
+body_vel.v = body_fixed_vel(:, 2);
 body_vel.w = body_fixed_vel(:, 3);
+
+body_vel_model.u = body_fixed_vel_model(:, 1);
+body_vel_model.v = body_fixed_vel_model(:, 2);
 body_vel_model.w = body_fixed_vel_model(:, 3);
 
+%-----------------------------------------------------------------------------------------------%
+% Plotting
+%-----------------------------------------------------------------------------------------------%
+orange = [1, 0.5, 0]; % RGB triplet for orange
+
+figure('Name', 'Vertical thrusters PWM values and thrust comparison')
+plot(time_from_start, vertical_thruster_pwm_val.right, 'r', 'LineWidth', 2)
+ylabel('Vertical thruster PWM value')
+xlabel('Time (s)')
+hold on
+grid on
+plot(time_from_start, vertical_thruster_pwm_val.left, 'g', 'LineWidth', 2)
+yyaxis right
+set(gca, 'YDir', 'reverse')
+plot(time_from_start, depth, 'b', 'LineWidth', 2)
+ylabel('Depth (m)')
+xlabel('Time (s)')
+legend('Right thruster', 'Left thruster', 'Depth')
+
+figure('Name', 'Vertical velocity comparison')
 plot(time_from_start, total_vertical_thrust, 'k', 'LineWidth', 2)
 ylabel('Total vertical thrust (N)')
 xlabel('Time (s)')
@@ -94,6 +140,10 @@ plot(time_from_start, body_vel_model.w, 'b', 'LineWidth', 2)
 ylabel('Body-fixed vertical velocity (m/s)')
 xlabel('Time (s)')
 legend('Total vertical thrust', 'Body-fixed vertical velocity', 'Body-fixed vertical velocity (model)')
+
+%-----------------------------------------------------------------------------------------------%
+% Functions
+%-----------------------------------------------------------------------------------------------%
 
 function thrust_array = pwm_to_thrust(pwm_array, direction)
 	thrust_array = zeros(size(pwm_array));
