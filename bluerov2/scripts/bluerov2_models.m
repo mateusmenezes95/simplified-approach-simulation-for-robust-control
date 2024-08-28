@@ -320,6 +320,32 @@ lower_model
 upper_model
 print_section_description("State Space Model Loaded")
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Thrust Configuration Matrices
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+bluerov2.standard.thrust_config_matrix = [
+  %  T1     T2      T3      T4      T5      T6
+  0.7071 0.7071 -0.7071 -0.7071  0.0000  0.0000; % contribution of horizontal thrusters to surge
+ -0.7071 0.7071 -0.7071  0.7071  0.0000  0.0000; % contribution of horizontal thrusters to sway
+  0.0000 0.0000  0.0000  0.0000 -1.0000 -1.0000; % contribution of vertical thrusters to heave
+ -0.1888 0.1888  0.1888 -0.1888  0.0000  0.0000; % contribution of horizontal thrusters to yaw
+];
+
+bluerov2.standard.thrust_config_matrix_pinv = pinv(bluerov2.standard.thrust_config_matrix);
+
+bluerov2.heave.thrust_config_matrix = [
+  %  T1     T2      T3      T4      T5      T6      T7      T8
+  0.7071  0.7071 -0.7071 -0.7071  0.0000  0.0000  0.0000  0.0000; % contribution of horizontal thrusters to surge
+ -0.7071  0.7071 -0.7071  0.7071  0.0000  0.0000  0.0000  0.0000; % contribution of horizontal thrusters to sway
+  0.0000  0.0000  0.0000  0.0000 -1.0000 -1.0000 -1.0000 -1.0000; % contribution of vertical thrusters to heave
+  0.0000  0.0000  0.0000  0.0000 -0.2180  0.2180  0.2180 -0.2180; % contribution of vertical thrusters to roll
+  0.0000  0.0000  0.0000  0.0000  0.1200  0.1200 -0.1200 -0.1200; % contribution of vertical thrusters to pitch
+ -0.1888  0.1888  0.1888 -0.1888  0.0000  0.0000  0.0000  0.0000; % contribution of horizontal thrusters to yaw
+];
+
+bluerov2.heave.thrust_config_matrix_pinv = pinv(bluerov2.heave.thrust_config_matrix);
+
 function M_RB = get_rigid_body_inertia_matrix(dynamic_model_parameter)
   M_RB = ...
   [
