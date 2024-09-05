@@ -13,7 +13,23 @@ addpath(genpath("../functions/matrices_getters"))
 run bluerov2_simulation_parameters
 run bluerov2_models
 
+% =============================================================================
+% Simulation parameters
+% =============================================================================
+
 degrees_of_freedom = string(["Surge", "Sway", "Heave", "Yaw"]);
+subplot_graphs = false;
+save_graphs = true;
+base_path_for_fig_save = "/home/mateus/ufba_ws/pgcomp-ufba-latex/figuras";
+
+if ~isfolder(base_path_for_fig_save)
+    disp("The folder " + base_path_for_fig_save + " does not exist!")
+    return
+end
+
+% =============================================================================
+% Uncertainty parameters
+% =============================================================================
 
 uncertainty_mass_or_inertia_vec = [
   [lower_model.mass, upper_model.mass]; ...               % For surge dof
@@ -60,10 +76,10 @@ opt.allownonconvex = 0;
 % =============================================================================
 
 q_per_state = [
-  create_array(100, 7000, 100);  % For surge dof
-  create_array(100, 7000, 100);  % For sway dof
-  create_array(100, 7000, 100);  % For heave dof
-  create_array(100, 7000, 100);   % For yaw dof
+  create_array(7100, 8000, 20);  % For surge dof
+  create_array(7100, 8000, 20);  % For sway dof
+  create_array(7100, 8000, 20);  % For heave dof
+  create_array(1100, 2000, 20);   % For yaw dof
 ];
 
 q_per_state_step_size = q_per_state(1, 2) - q_per_state(1, 1);
@@ -117,9 +133,9 @@ for ss_num = 1:amount_of_decoupled_states
                             Gd'*Almi' Gd+Gd'-Pd zeros(n, amount_of_inputs) Gd'*Clmi'; ...
                             Blmi' zeros(amount_of_inputs, n) eye(amount_of_inputs) Dlmi'; ...
                             zeros(amount_of_inputs, n) Clmi*Gd Dlmi eye(amount_of_inputs)*mu] >= 0];
-          end % end for k loop
-        end % end for j loop
-      end % end for i loop
+          end % end for k loop (added mass)
+        end % end for j loop (linear damping)
+      end % end for i loop (mass or inertia)
     
       objective = mu;
       yalmipdiagnostics = optimize(ineqs, objective, opts);
@@ -164,29 +180,51 @@ for ss_num = 1:amount_of_decoupled_states
       loop_index = loop_index + 1;
   end
 
-  % =============================================================================
-  if ss_num == 1
-    figure1 = figure("Name", "Norms by LMI");
+  if subplot_graphs
+    % =============================================================================
+    if ss_num == 1
+      figure1 = figure("Name", "Norms by LMI");
+    else
+      figure(figure1.Number)
+    end
+    % =============================================================================
+    subplot(2,2,ss_num)
+    plot_overlapping_norms(q_per_state(ss_num, :), q_per_state_step_size, lmi_norm_with_uncertainty_vec(ss_num, :), ...
+                          matlab_norm_without_uncertainty_vec(ss_num, :), ...
+                          {'With uncertainty', 'Without uncertainty'})
+    % =============================================================================
+    if ss_num == 1
+      figure2 = figure("Name", "Maximum delay allowed by LMI and Matlab");
+    else
+      figure(figure2.Number)
+    end
+    % =============================================================================
+    subplot(2,2,ss_num)
+    plot_overlapping_nmax(q_per_state(ss_num, :), q_per_state_step_size, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
+                          lmi_nmax_with_uncertainty_vec(ss_num, :), ...
+                          "", {'Without uncertainty', 'With uncertainty'})
+    % =============================================================================
   else
-    figure(figure1.Number)
+    % =============================================================================
+    figure_title = "norma-h-infinito-para-" + degrees_of_freedom(ss_num);
+    figure("Name", figure_title)
+    plot_overlapping_norms(q_per_state(ss_num, :), q_per_state_step_size, lmi_norm_with_uncertainty_vec(ss_num, :), ...
+                          matlab_norm_without_uncertainty_vec(ss_num, :), ...
+                          {'Com Incerteza', 'Sem Incerteza'})
+    if save_graphs
+        saveas(gcf, fullfile(base_path_for_fig_save, figure_title + ".eps"), 'epsc');
+    end
+    % ========================================================================
+    figure_title = "atraso-maximo-permitido-por-lmi-para-" + degrees_of_freedom(ss_num);
+    figure("Name", figure_title)
+    plot_overlapping_nmax(q_per_state(ss_num, :), q_per_state_step_size, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
+                          lmi_nmax_with_uncertainty_vec(ss_num, :), ...
+                          "", {'Sem Incerteza', 'Com Incerteza'})
+    if save_graphs
+        saveas(gcf, fullfile(base_path_for_fig_save, figure_title + ".eps"), 'epsc');
+    end
+    % =============================================================================
   end
-  % =============================================================================
-  subplot(2,2,ss_num)
-  plot_overlapping_norms(q_per_state(ss_num, :), q_per_state_step_size, lmi_norm_with_uncertainty_vec(ss_num, :), ...
-                        matlab_norm_without_uncertainty_vec(ss_num, :), ...
-                        {'With uncertainty', 'Without uncertainty'})
-  % =============================================================================
-  if ss_num == 1
-    figure2 = figure("Name", "Maximum delay allowed by LMI and Matlab");
-  else
-    figure(figure2.Number)
-  end
-  % =============================================================================
-  subplot(2,2,ss_num)
-  plot_overlapping_nmax(q_per_state(ss_num, :), q_per_state_step_size, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
-                        lmi_nmax_with_uncertainty_vec(ss_num, :), ...
-                        "", {'Without uncertainty', 'With uncertainty'})
-  % =============================================================================
 
   close(waitbar_fig)
 end

@@ -3,7 +3,7 @@ function plot_overlapping_norms(x_axis_ticks, x_axis_ticks_step, underlay_norms,
     stem(x_axis_ticks, underlay_norms, "Marker", ".", "Color", "b")
     hold on
     stem(x_axis_ticks, overlay_norms, "Marker", "x", "Color", "r")
-    legend(legends{1}, legends{2}, "Location", "northwest");
+    legend(legends{1}, legends{2}, "Location", "southeast");
     grid on
     xlabel('q')
     ylabel('||H_\infty||')

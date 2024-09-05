@@ -4,7 +4,7 @@ function plot_overlapping_nmax(x_axis_ticks, x_axis_ticks_step, ...
     title(title_str)
     hold on
     stem(x_axis_ticks, overlay_nmax, "Marker", ".", "Color", "b")
-    legend(legends{1}, legends{2});
+    legend(legends{1}, legends{2}, "Location", "southeast");
     grid on
     xlabel('q')
     ylabel('N_{max}')
