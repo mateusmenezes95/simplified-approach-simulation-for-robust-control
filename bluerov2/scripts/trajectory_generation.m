@@ -5,6 +5,7 @@ current_script_path = fileparts(mfilename('fullpath'));
 cd(current_script_path)
 
 addpath(genpath("../../lib/utils"))
+addpath(genpath("../../lib/charts_functions"))
 
 % Run some scripts to load the simulation parameters
 run bluerov2_simulation_parameters
@@ -58,12 +59,26 @@ y(20 <= t & t < 30) = 1;
 y(30 <= t & t < 40) = 1 - nav_vel_in_meter_per_second * (t(30 <= t & t < 40) - 30);
 y(t >= 40) = 0;
 
+figure("Name", "Robot trajectory")
+plot_robot_trajectory(x, y, -1, 'r', 1.5)
+
 z = zeros(size(t));
 
 psi = zeros(size(t));
 psi(10 <= t & t < 20) = deg2rad(90);
 psi(20 <= t & t < 30) = deg2rad(180);
 psi(30 <= t & t <= 40) = deg2rad(270);
+
+figure("Name", "Position and Attitude in NED frame")
+subplot(4, 1, 1)
+plot_states(t, x, 'x [m]')
+subplot(4, 1, 2)
+plot_states(t, y, 'y [m]')
+subplot(4, 1, 3)
+plot_states(t, z, 'z [m]')
+subplot(4, 1, 4)
+plot_states(t, rad2deg(psi), '\psi [deg]')
+xlabel('Time [s]')
 
 x_dot = lsim(nominal_model.vel_ref_tf.x, x, t);
 y_dot = lsim(nominal_model.vel_ref_tf.y, y, t);
@@ -76,16 +91,36 @@ right_color = [0 0 1];  % Blue
 set(fig,'defaultAxesColorOrder',[left_color; right_color]);
 
 subplot(4, 1, 1)
-plot_states(t, x, x_dot, 'x', '\dot{x}');
+plot_pose_and_velocity(t, x, x_dot, 'x', '\dot{x}');
 subplot(4, 1, 2)
-plot_states(t, y, y_dot, 'y', '\dot{y}');
+plot_pose_and_velocity(t, y, y_dot, 'y', '\dot{y}');
 subplot(4, 1, 3)
-plot_states(t, z, z_dot, 'z', '\dot{z}');
+plot_pose_and_velocity(t, z, z_dot, 'z', '\dot{z}');
 subplot(4, 1, 4)
-plot_states(t, psi, psi_dot, '\psi', '\dot{\psi}');
+plot_pose_and_velocity(t, psi, psi_dot, '\psi', '\dot{\psi}');
+
+figure("Name", "Velocities in NED frame")
+subplot(4, 1, 1)
+plot(t, x_dot, 'r', 'LineWidth', 1.5)
+ylabel('$\dot{x}$ [m/s]', 'Interpreter', 'latex')
+grid on
+subplot(4, 1, 2)
+plot(t, y_dot, 'r', 'LineWidth', 1.5)
+ylabel('$\dot{y}$ [m/s]', 'Interpreter', 'latex')
+grid on
+subplot(4, 1, 3)
+plot(t, z_dot, 'r', 'LineWidth', 1.5)
+ylabel('$\dot{z}$ [m/s]', 'Interpreter', 'latex')
+grid on
+subplot(4, 1, 4)
+plot(t, psi_dot, 'r', 'LineWidth', 1.5)
+xlabel('Tempo [s]')
+ylabel('$\dot{\psi}$ [rad/s]', 'Interpreter', 'latex')
+grid on
 
 x_dot_rotated = zeros(size(x_dot));
 y_dot_rotated = zeros(size(y_dot));
+z_dot_rotated = z_dot;  % z_dot is the same in both frames because there is rotation only in the x-y plane
 psi_filtered = lsim(nominal_model.pos_ref_tf.psi, psi, t);
 
 for i = 1:length(x_dot)
@@ -93,15 +128,23 @@ for i = 1:length(x_dot)
 	y_dot_rotated(i) = (x_dot(i) * sin(-psi_filtered(i))) + (y_dot(i) * cos(-psi_filtered(i)));
 end
 
-figure
-subplot(3, 1, 1)
-plot(t, x_dot_rotated)
+figure("Name", "Velocities in body-fixed frame")
+subplot(4, 1, 1)
+plot(t, x_dot_rotated, 'r', 'LineWidth', 1.5)
+ylabel('u [m/s]')
 grid on
-subplot(3, 1, 2)
-plot(t, y_dot_rotated)
+subplot(4, 1, 2)
+plot(t, y_dot_rotated, 'r', 'LineWidth', 1.5)
+ylabel('v [m/s]')
 grid on
-subplot(3, 1, 3)
-plot(t, psi_dot)
+subplot(4, 1, 3)
+plot(t, z_dot, 'r', 'LineWidth', 1.5)
+ylabel('w [m/s]')
+grid on
+subplot(4, 1, 4)
+plot(t, psi_dot, 'r', 'LineWidth', 1.5)
+xlabel('Time [s]')
+ylabel('r [rad/s]')
 grid on
 
 function s = create_s()
@@ -116,15 +159,22 @@ function [G_pos, G_vel] = getDiscreteRefenceModelTf(ksi, wn, sampling_period)
 	G_vel = c2d(s*G, sampling_period, 'tustin');  % s*G is used to get the velocity reference model
 end
 
-function plot_states(t, pos_or_attitude, pos_or_attitude_dot, label1, label2)
+function plot_states(t, pos_or_attitude, ylabel_name)
+	plot(t, pos_or_attitude, 'LineWidth', 1.5, 'Color', 'r')
+	ylim([min(pos_or_attitude) max(pos_or_attitude)+0.1])
+	ylabel(ylabel_name)
+	grid on
+end
+
+function plot_pose_and_velocity(t, pos_or_attitude, pos_or_attitude_dot, label1, label2)
 	yyaxis left
 	title(['$' label1 '$ and $' label2 '$ in NED frame'], 'Interpreter', 'latex');
-	plot(t, pos_or_attitude)
+	plot(t, pos_or_attitude, 'LineWidth', 1.5)
 	ylim([min(pos_or_attitude) max(pos_or_attitude)+0.1])
 	ylabel([label1 '(t) [m]'])
 
 	yyaxis right
-	plot(t, pos_or_attitude_dot)
+	plot(t, pos_or_attitude_dot, 'LineWidth', 1.5)
 	ylabel(['$\dot{' label1 '}(t)$ [$ms^{-1}$]'], 'Interpreter', 'latex')
 	ylim([min(pos_or_attitude_dot)-0.1 max(pos_or_attitude_dot)+0.1])
 
