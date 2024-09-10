@@ -19,7 +19,7 @@ run bluerov2_models
 
 degrees_of_freedom = string(["Surge", "Sway", "Heave", "Yaw"]);
 subplot_graphs = false;
-save_graphs = true;
+save_graphs = false;
 base_path_for_fig_save = "/home/mateus/ufba_ws/pgcomp-ufba-latex/figuras";
 
 if ~isfolder(base_path_for_fig_save)
@@ -89,6 +89,13 @@ r_per_state = [
   200; ...  % For sway dof
   200; ...  % For heave dof
   200; ...  % For yaw dof
+];
+
+legend_location_per_state = [
+  "southeast"; ...  % For surge dof
+  "southeast"; ...  % For sway dof
+  "southeast"; ...  % For heave dof
+  "best"; ...  % For yaw dof
 ];
 
 lmi_norm_with_uncertainty_vec = zeros(amount_of_decoupled_states, size(q_per_state(1,:), 2));
@@ -189,7 +196,7 @@ for ss_num = 1:amount_of_decoupled_states
     end
     % =============================================================================
     subplot(2,2,ss_num)
-    plot_overlapping_norms(q_per_state(ss_num, :), q_per_state_step_size, lmi_norm_with_uncertainty_vec(ss_num, :), ...
+    plot_overlapping_norms(q_per_state(ss_num, :), 100, lmi_norm_with_uncertainty_vec(ss_num, :), ...
                           matlab_norm_without_uncertainty_vec(ss_num, :), ...
                           {'With uncertainty', 'Without uncertainty'})
     % =============================================================================
@@ -200,7 +207,7 @@ for ss_num = 1:amount_of_decoupled_states
     end
     % =============================================================================
     subplot(2,2,ss_num)
-    plot_overlapping_nmax(q_per_state(ss_num, :), q_per_state_step_size, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
+    plot_overlapping_nmax(q_per_state(ss_num, :), 100, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
                           lmi_nmax_with_uncertainty_vec(ss_num, :), ...
                           "", {'Without uncertainty', 'With uncertainty'})
     % =============================================================================
@@ -208,18 +215,18 @@ for ss_num = 1:amount_of_decoupled_states
     % =============================================================================
     figure_title = "norma-h-infinito-para-" + degrees_of_freedom(ss_num);
     figure("Name", figure_title)
-    plot_overlapping_norms(q_per_state(ss_num, :), q_per_state_step_size, lmi_norm_with_uncertainty_vec(ss_num, :), ...
+    plot_overlapping_norms(q_per_state(ss_num, :), 100, lmi_norm_with_uncertainty_vec(ss_num, :), ...
                           matlab_norm_without_uncertainty_vec(ss_num, :), ...
-                          {'Com Incerteza', 'Sem Incerteza'})
+                          {'Com Incerteza', 'Sem Incerteza'}, legend_location_per_state(ss_num,1));
     if save_graphs
         saveas(gcf, fullfile(base_path_for_fig_save, figure_title + ".eps"), 'epsc');
     end
     % ========================================================================
     figure_title = "atraso-maximo-permitido-por-lmi-para-" + degrees_of_freedom(ss_num);
     figure("Name", figure_title)
-    plot_overlapping_nmax(q_per_state(ss_num, :), q_per_state_step_size, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
+    plot_overlapping_nmax(q_per_state(ss_num, :), 100, matlab_nmax_without_uncertainty_vec(ss_num, :), ...
                           lmi_nmax_with_uncertainty_vec(ss_num, :), ...
-                          "", {'Sem Incerteza', 'Com Incerteza'})
+                          "", {'Sem Incerteza', 'Com Incerteza'}, legend_location_per_state(ss_num,1))
     if save_graphs
         saveas(gcf, fullfile(base_path_for_fig_save, figure_title + ".eps"), 'epsc');
     end

@@ -1,21 +1,23 @@
 function plot_overlapping_nmax(x_axis_ticks, x_axis_ticks_step, ...
-                               underlay_nmax, overlay_nmax, title_str, legends)
+                               underlay_nmax, overlay_nmax, title_str, legends, ...
+                               legend_location)
     stem(x_axis_ticks, underlay_nmax, "Marker", "x", "Color", "r")
     title(title_str)
     hold on
     stem(x_axis_ticks, overlay_nmax, "Marker", ".", "Color", "b")
-    legend(legends{1}, legends{2}, "Location", "southeast");
+    legend(legends{1}, legends{2}, "Location", legend_location);
     grid on
     xlabel('q')
     ylabel('N_{max}')
-    xlim([x_axis_ticks(2) max(x_axis_ticks)])
-    maximum_nmax = max([overlay_nmax(2:end); underlay_nmax(2:end)], [], 'all'); 
+    xlim([x_axis_ticks(1) max(x_axis_ticks)])
+    maximum_nmax = max([overlay_nmax(1:end); underlay_nmax(1:end)], [], 'all'); 
     yticks(0:1:maximum_nmax)
-    xticks(x_axis_ticks(2):x_axis_ticks_step:max(x_axis_ticks))
+    xticks(x_axis_ticks(1):x_axis_ticks_step:max(x_axis_ticks))
     if max(overlay_nmax) == 0
         ylim([0 1])
         yticks([0 1])
     else
         ylim([0 maximum_nmax])
     end
+    xtickangle(45)
 end
