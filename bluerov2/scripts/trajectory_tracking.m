@@ -26,7 +26,7 @@ dynamic_model.gravity_vector = [0; 0; 2.5; 0];
 integration_step_ratio = 50;
 integration_step_size = sampling_period/integration_step_ratio;
 
-simulation_time = 41.5;
+simulation_time = total_time + 2.0;
 end_time = ceil(simulation_time/sampling_period)*sampling_period;
 
 time = 0:integration_step_size:simulation_time;
@@ -89,7 +89,6 @@ vel_ref = [x_dot_rotated'; y_dot_rotated'; z_dot'; psi_dot'];
 %===================================================================================================
 body_fixed_vel = zeros(state_vector_size, num_of_simulation_steps+1);  % v(:, 1) = [0; 0; 0; 0] -> Initial condition
 body_fixed_vel_sampled = zeros(state_vector_size, num_of_samples+1);
-control_signal = zeros(state_vector_size, num_of_samples+1);
 
 position_and_attitude = zeros(state_vector_size, num_of_simulation_steps+1);
 position_and_attitude_sampled = zeros(state_vector_size, num_of_samples+1);
