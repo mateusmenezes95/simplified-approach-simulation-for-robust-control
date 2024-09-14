@@ -3,6 +3,9 @@ addpath(genpath(current_script_path  + "/../../lib/utils"))
 
 run bluerov2_simulation_parameters
 
+gravity_constant = 9.82;
+water_density = 1000;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MANZANILLA, A. et al. Autonomous navigation for unmanned underwater vehicles:
 % Real-time experiments using computer vision. IEEE Robotics and Automation Letters,
@@ -50,6 +53,7 @@ manzanilla_model.color = "r";
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 lipenitis_model.name = "Lipenitis";
 lipenitis_model.mass = 11.4;
+lipenitis_model.volume = 0.0114;
 
 lipenitis_model.inertia.zz = 0.245;
 
@@ -91,6 +95,7 @@ lipenitis_model.color = "b";
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 benzon_model.name = "Benzon";
 benzon_model.mass = 13.5;
+benzon_model.volume = 0.0134;
 
 benzon_model.inertia.zz = 0.37;
 
@@ -132,6 +137,7 @@ benzon_model.color = "g";
 
 lower_model.name = "Lower Model";
 lower_model.mass = min([manzanilla_model.mass, lipenitis_model.mass, benzon_model.mass]);
+lower_model.volume = min([lipenitis_model.volume, benzon_model.volume]);
 
 lower_model.inertia.zz = min([manzanilla_model.inertia.zz, lipenitis_model.inertia.zz, benzon_model.inertia.zz]);
 
@@ -196,6 +202,7 @@ lower_model.color = "y";
 upper_model.name = "Upper Model";
 
 upper_model.mass = max([manzanilla_model.mass, lipenitis_model.mass, benzon_model.mass]);
+upper_model.volume = max([lipenitis_model.volume, benzon_model.volume]);
 
 upper_model.inertia.zz = max([manzanilla_model.inertia.zz, lipenitis_model.inertia.zz, benzon_model.inertia.zz]);
 
@@ -260,6 +267,7 @@ upper_model.color = "c"
 nominal_model.name = "Nominal Model";
 
 nominal_model.mass = (lower_model.mass + upper_model.mass)/2;
+nominal_model.volume = (lower_model.volume + upper_model.volume)/2;
 
 nominal_model.inertia.zz = (lower_model.inertia.zz + upper_model.inertia.zz)/2;
 

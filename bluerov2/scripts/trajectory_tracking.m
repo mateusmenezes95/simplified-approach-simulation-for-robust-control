@@ -21,7 +21,11 @@ run trajectory_generation
 %===================================================================================================
 dynamic_model = nominal_model;
 state_vector_size = size(dynamic_model.discrete_state_space.Ad, 1);
-dynamic_model.gravity_vector = [0; 0; 2.5; 0];
+
+vehicle_weight = dynamic_model.mass*gravity_constant;
+vehicle_buoyancy = water_density*gravity_constant*dynamic_model.volume;
+z_restoring_force = -(vehicle_weight - vehicle_buoyancy);
+dynamic_model.gravity_vector = [0; 0; z_restoring_force; 0];
 
 integration_step_ratio = 50;
 integration_step_size = sampling_period/integration_step_ratio;
