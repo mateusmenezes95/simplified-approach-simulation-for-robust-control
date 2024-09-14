@@ -95,7 +95,11 @@ body_fixed_vel = zeros(state_vector_size, num_of_simulation_steps+1);  % v(:, 1)
 body_fixed_vel_sampled = zeros(state_vector_size, num_of_samples+1);
 
 position_and_attitude = zeros(state_vector_size, num_of_simulation_steps+1);
+position_and_attitude(:, 1) = [0; 0; 5; 0];
 position_and_attitude_sampled = zeros(state_vector_size, num_of_samples+1);
+position_and_attitude_sampled(:, 1) = position_and_attitude(:, 1);
+
+ned_velocities = zeros(state_vector_size, num_of_simulation_steps+1);
 
 generalized_forces = zeros(state_vector_size, num_of_simulation_steps+1);
 generalized_forces_sampled = zeros(state_vector_size, num_of_samples+1);
@@ -120,7 +124,7 @@ for i=1:num_of_simulation_steps
 
 	% Sample instant
 	if (mod(i, integration_step_ratio) == 1 || i == 1)
-		horizon_refs = generate_horizon_vel_ref(vel_ref, params);;
+		horizon_refs = generate_horizon_vel_ref(vel_ref, params);
 		horizon_ref(1:state_vector_size, k) = horizon_refs(1:state_vector_size);
 		params.current_time_step = params.current_time_step + 1;
 
@@ -155,6 +159,7 @@ for i=1:num_of_simulation_steps
 
 	position_and_attitude_args.yaw = position_and_attitude(4, i);
 
+	ned_velocities(:, i+1) = body_fixed_to_inertial_frame(body_fixed_vel(:, i+1), position_and_attitude_args);
 	position_and_attitude(:, i+1) = rk4(position_and_attitude(:, i), body_fixed_vel(:, i+1), ...
 																			integration_step_size, @body_fixed_to_inertial_frame, ...
 																			position_and_attitude_args);
@@ -163,6 +168,7 @@ end
 % body_fixed_vel(:, 1) is the initial condition, so we remove it
 body_fixed_vel = body_fixed_vel(:, 2:end);
 position_and_attitude = position_and_attitude(:, 2:end);
+ned_velocities = ned_velocities(:, 2:end);
 generalized_forces = generalized_forces(:, 2:end);
 
 %===================================================================================================
@@ -175,22 +181,24 @@ generalized_forces = generalized_forces(:, 2:end);
 figure("Name", "bluerov-states")
 plot_bluerov_states(sim_time, body_fixed_vel, '-r', line_thickness)
 
+figure("Name", "NED Velocities");
+plot_bluerov_states(sim_time, ned_velocities, '-r', line_thickness)
+
 figure("Name", "bluerov-control-signals")
 plot_generalized_forces(sim_time, generalized_forces, -1, '-r', line_thickness)
 
-figure("Name", "bluerov-3d-trajectory")
-plot3(position_and_attitude(1,:), ...
-			position_and_attitude(2,:), ...
-			position_and_attitude(3,:), ...
-			'-r', 'linewidth', line_thickness)
-grid on
-zlim([-5 5])
+x_n = position_and_attitude(1,:);
+y_n = position_and_attitude(2,:);
+z_n = position_and_attitude(3,:);
+yaw = position_and_attitude(4,:);
 
-figure("Name", "bluerov-2d-trajectory")
-plot(position_and_attitude(1,:), ...
-			position_and_attitude(2,:), ...
-			'-r', 'linewidth', line_thickness)
-grid on
+figure("Name", "Position and Attitude in NED frame")
+plot_individual_position_and_attitude(sim_time, x_n, y_n, z_n, yaw);
+
+figure("Name", "bluerov-3d-trajectory")
+plot_3d_robot_path(x_n, y_n, z_n, '-r', line_thickness);
+hold on
+plot_3d_robot_path(x, y, z, '--k', 1.0);
 % %===================================================================================================
 % End of charts
 %===================================================================================================
@@ -204,9 +212,9 @@ function ned_vel = body_fixed_to_inertial_frame(body_fixed_vel, arg)
 	yaw = arg.yaw;
 	body_fixed_to_ned_rot = [
 		cos(yaw) -sin(yaw) 0 0; ...
-		sin(yaw) cos(yaw) 0 0; ...
-		0 0 1 0; ...
-		0 0 0 1];
+		sin(yaw)  cos(yaw) 0 0; ...
+		   0         0     1 0; ...
+		   0         0     0 1];
 	ned_vel = body_fixed_to_ned_rot*body_fixed_vel;
 end
 
@@ -355,4 +363,39 @@ function plot_generalized_forces (t, u, legend_name, line_spec, line_thickness, 
 			title('Generalized forces (control signals)')
 		end
 	end
+end
+
+function plot_states(t, pos_or_attitude, ylabel_name)
+	plot(t, pos_or_attitude, 'LineWidth', 1.5, 'Color', 'r')
+	ylim([min(pos_or_attitude) max(pos_or_attitude)+0.1])
+	ylabel(ylabel_name)
+	grid on
+end
+
+function plot_3d_robot_path(x, y, z, line_color, line_width)
+	plot3(x(1,:), y(1,:), z(1,:), line_color, 'linewidth', line_width)
+	[x_min, x_max] = get_axis_limits(x, 0.1);
+	[y_min, y_max] = get_axis_limits(y, 0.1);
+	[z_min, z_max] = get_axis_limits(z, 0.1);
+	z_min = 0;
+	grid on
+	axis([x_min, x_max, y_min, y_max, z_min, z_max])
+	set(gca, 'ZDir', 'reverse')
+	xlabel('x [m]')
+	ylabel('y [m]')
+	zlabel('z [m]')
+end
+
+function plot_individual_position_and_attitude(t, x, y, z, yaw)
+	subplot(4, 1, 1)
+	plot_states(t, x, 'x [m]')
+
+	subplot(4, 1, 2)
+	plot_states(t, y, 'y [m]')
+
+	subplot(4, 1, 3)
+	plot_states(t, z, 'z [m]')
+
+	subplot(4, 1, 4)
+	plot_states(t, rad2deg(yaw), '\psi [deg]')
 end

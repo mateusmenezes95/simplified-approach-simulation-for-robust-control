@@ -39,101 +39,41 @@ nominal_model.G_n_to_r.wn = bandwidth(nominal_model.tf.G_n_to_r)*bandwidth_reduc
 [nominal_model.pos_ref_tf.z, nominal_model.vel_ref_tf.z] = getDiscreteRefenceModelTf(ksi, nominal_model.G_z_to_w.wn, sampling_period);
 [nominal_model.pos_ref_tf.psi, nominal_model.vel_ref_tf.psi] = getDiscreteRefenceModelTf(ksi, nominal_model.G_n_to_r.wn, sampling_period);
 
-time_segment_for_xy_plane = [
-	0 10;		 % Line:1 - Navigating in the +x direction
-	10 15;   % Line:2 - Turning 90 degrees in counterclockwise direction
-	15 25;   % Line:3 - Navigating in the +y direction
-	25 30;   % Line:4 - Turning 90 degrees in counterclockwise direction
-	30 40;   % Line:5 - Navigating in the -x direction
-	40 45;   % Line:6 - Turning 90 degrees in counterclockwise direction
-	45 55;   % Line:7 - Navigating in the -y direction
-	55 60;   % Line:8 - Turning 90 degrees in counterclockwise direction
-];
-
-time_segment_for_z = [
-	0 15 1;		 % Line:1 - Depth = 1m during 1 second
-	16 17 2;		 % Line:2 - Depth = 2m during 1 second
-	17 23 2;		 % Line:3 - Depth = 2m during 6 seconds
-	23 24 1;		 % Line:4 - Depth = 1m during 1 second
-];
-
 square_size_in_meters = 1;
 linear_nav_vel_in_si = 0.1;
 ang_vel_in_si = deg2rad(90)/5.0;  % 90 degrees in 5 seconds
-is_to_plot_time_labels = true;
+is_to_plot_time_labels = false;
 
-total_time = time_segment_for_xy_plane(end, 2);
-t = 0:sampling_period:total_time;
+total_time = 55;
+t = 0:sampling_period:(total_time-sampling_period);
+trajectory = zeros(size(t, 2), state_vector_size);
+velocity = zeros(size(t, 2), state_vector_size);
 
-x = zeros(size(t));
-y = zeros(size(t)); % Initialize x as a vector of zeros with the same size as t
-z = ones(size(t));
-psi = zeros(size(t));
+waypoints = {
+	{[0 0 5 0], 0};
+	{[1 0 5 0], 10};
+	{[1 0 5 -pi/2], 15};
+	{[1 0 2 -pi/2], 25};
+	{[2 0 2 -pi/2], 35};
+	{[2 0 5 -pi/2], 45};
+	{[3 0 5 -pi/2], 55};
+};
 
-t0 = time_segment_for_xy_plane(1, 1);
-tf = time_segment_for_xy_plane(1, 2);
-x(t >= t0 & t < tf) = linear_nav_vel_in_si * (t(t >= t0 & t < tf) - t0); % Navigating in the +x direction
-y(t >= t0 & t < tf) = 0;
-psi(t >= t0 & t < tf) = 0;
-
-t0 = time_segment_for_xy_plane(2, 1);
-tf = time_segment_for_xy_plane(2, 2);
-x(t >= t0 & t < tf) = square_size_in_meters;
-y(t >= t0 & t < tf) = 0;
-psi(t >= t0 & t < tf) = ang_vel_in_si * (t(t >= t0 & t < tf) - t0);
-
-t0 = time_segment_for_xy_plane(3, 1);
-tf = time_segment_for_xy_plane(3, 2);
-x(t >= t0 & t < tf) = square_size_in_meters;
-y(t >= t0 & t < tf) = linear_nav_vel_in_si * (t(t >= t0 & t < tf) - t0); % Navigating in the +y direction
-psi(t >= t0 & t < tf) = deg2rad(90);
-
-t0 = time_segment_for_xy_plane(4, 1);
-tf = time_segment_for_xy_plane(4, 2);
-x(t >= t0 & t < tf) = square_size_in_meters;
-y(t >= t0 & t < tf) = square_size_in_meters;
-psi(t >= t0 & t < tf) = ang_vel_in_si * (t(t >= t0 & t < tf) - t0) + deg2rad(90);
-
-t0 = time_segment_for_xy_plane(5, 1);
-tf = time_segment_for_xy_plane(5, 2);
-x(t >= t0 & t < tf) = square_size_in_meters - linear_nav_vel_in_si * (t(t >= t0 & t < tf) - t0); % Navigating in the -x direction
-y(t >= t0 & t < tf) = square_size_in_meters;
-psi(t >= t0 & t < tf) = deg2rad(180);
-
-t0 = time_segment_for_xy_plane(6, 1);
-tf = time_segment_for_xy_plane(6, 2);
-x(t >= t0 & t < tf) = 0;
-y(t >= t0 & t < tf) = square_size_in_meters;
-psi(t >= t0 & t < tf) = ang_vel_in_si * (t(t >= t0 & t < tf) - t0) + deg2rad(180);
-
-t0 = time_segment_for_xy_plane(7, 1);
-tf = time_segment_for_xy_plane(7, 2);
-x(t >= t0 & t < tf) = 0;
-y(t >= t0 & t < tf) = square_size_in_meters - linear_nav_vel_in_si * (t(t >= t0 & t < tf) - t0); % Navigating in the -y direction
-psi(t >= t0 & t < tf) = deg2rad(270);
-
-t0 = time_segment_for_xy_plane(8, 1);
-tf = time_segment_for_xy_plane(8, 2);
-x(t >= t0 & t < tf) = 0;
-y(t >= t0 & t < tf) = 0;
-psi(t >= t0 & t < tf) = ang_vel_in_si * (t(t >= t0 & t < tf) - t0) + deg2rad(270);
-
-t0 = time_segment_for_z(1, 1);
-tf = time_segment_for_z(1, 2);
-depth = time_segment_for_z(1, 3);
-z(t >= t0 & t < tf) = depth;
-last_depth = depth;
-
-for i = 2:size(time_segment_for_z, 1)
-	t0 = time_segment_for_z(i, 1);
-	tf = time_segment_for_z(i, 2);
-	depth = time_segment_for_z(i, 3);
-	z(t >= t0 & t < tf) = last_depth + (depth - last_depth) * (t(t >= t0 & t < tf) - t0);
-	last_depth = depth;
+for i=2:length(waypoints)
+	p0 = waypoints{i-1}{1};
+	pf = waypoints{i}{1};
+	t0 = waypoints{i-1}{2};
+	tf = waypoints{i}{2};
+	[trajectory, velocity] = make_segment(t, t0, tf, p0, pf, trajectory, velocity);
 end
 
+x = trajectory(:, 1);
+y = trajectory(:, 2);
+z = trajectory(:, 3);
+psi = trajectory(:, 4);
+
 figure("Name", "bluerov-3d-trajectory")
-plot_3d_robot_path(x, y, z, 'r', 1.5)
+plot_3d_robot_path(x', y', z', 'r', 1.5)
 
 time_points = [10 15 25 30 40 45 55 60];
 time_labels = {'t_1', 't_2', 't_3', 't_4', 't_5', 't_6', 't_7', 't_8'};
@@ -157,10 +97,10 @@ plot_time_labels(time_points, time_labels, is_to_plot_time_labels)
 
 xlabel('Time [s]')
 
-x_dot = lsim(nominal_model.vel_ref_tf.x, x, t);
-y_dot = lsim(nominal_model.vel_ref_tf.y, y, t);
-z_dot = lsim(nominal_model.vel_ref_tf.z, z, t);
-psi_dot = lsim(nominal_model.vel_ref_tf.psi, psi, t);
+x_dot = velocity(:, 1);
+y_dot = velocity(:, 2);
+z_dot = velocity(:, 3);
+psi_dot = velocity(:, 4);
 
 fig = figure("Name", "Position and Velocity in NED frame");
 left_color = [1 0 0];  % Red
@@ -278,7 +218,41 @@ function plot_3d_robot_path(x, y, z, line_color, line_width)
 	[z_min, z_max] = get_axis_limits(z, 0.1);
 	grid on
 	axis([x_min, x_max, y_min, y_max, z_min, z_max])
+	set(gca, 'ZDir', 'reverse')
 	xlabel('x [m]')
 	ylabel('y [m]')
 	zlabel('z [m]')
+end
+
+function [pose, pose_deriv] = make_segment(t, t0, tf, p0, pf, pose, pose_deriv)
+% MAKE_SEGMENT Generates a segment of a trajectory
+%
+%   [pose, pose_deriv, tf] = MAKE_SEGMENT(t, t0, p0, pf, vel, pose, pose_deriv)
+%   generates a segment of a trajectory from an initial position p0 to a
+%   final position pf with a given velocity vel. The function updates the
+%   pose and pose_deriv arrays with the new segment and returns the updated
+%   arrays along with the final time tf for the segment.
+%
+%   Inputs:
+%       t - Time vector
+%       t0 - Initial time for the segment
+%       p0 - Initial position for the segment
+%       pf - Final position for the segment
+%       vel - Velocity array for the segment
+%       pose - Array to store the positions of the trajectory
+%       pose_deriv - Array to store the velocities of the trajectory
+%
+%   Outputs:
+%       pose - Updated array with the positions of the trajectory
+%       pose_deriv - Updated array with the velocities of the trajectory
+%       tf - Final time for the segment
+
+    % Calculate the final time for the segment
+		vel = (pf - p0) ./ (tf - t0);
+		idx = find(t >= t0 & t < tf);
+
+		for i = 1:length(idx)
+			pose(idx(i), :) = p0 + vel * (t(idx(i)) - t0);
+			pose_deriv(idx(i), :) = vel;
+		end
 end
