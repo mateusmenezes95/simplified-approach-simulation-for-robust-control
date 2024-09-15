@@ -6,6 +6,7 @@ cd(current_script_path)
 
 addpath(genpath("../../lib/utils"))
 addpath(genpath("../../lib/charts_functions"))
+addpath(genpath("../functions/plots"))
 
 % Run some scripts to load the simulation parameters
 run bluerov2_simulation_parameters
@@ -44,125 +45,70 @@ linear_nav_vel_in_si = 0.1;
 ang_vel_in_si = deg2rad(90)/5.0;  % 90 degrees in 5 seconds
 is_to_plot_time_labels = false;
 
-total_time = 55;
-t = 0:sampling_period:(total_time-sampling_period);
-trajectory = zeros(size(t, 2), state_vector_size);
-velocity = zeros(size(t, 2), state_vector_size);
-
 waypoints = {
-	{[0 0 5 0], 0};
-	{[1 0 5 0], 10};
+	{[0 0 5   0  ],  0};
+	{[1 0 5   0  ], 10};
 	{[1 0 5 -pi/2], 15};
-	{[1 0 2 -pi/2], 25};
-	{[2 0 2 -pi/2], 35};
-	{[2 0 5 -pi/2], 45};
-	{[3 0 5 -pi/2], 55};
+	{[1 0 2 -pi/2], 45};
+	{[2 0 2 -pi/2], 55};
+	{[2 0 5 -pi/2], 85};
+	{[3 0 5 -pi/2], 95};
 };
+
+total_time = waypoints{end}{2};
+t = 0:sampling_period:(total_time-sampling_period);
+desired.trajectory = zeros(size(t, 2), state_vector_size);
+desired.ned_velocity = zeros(size(t, 2), state_vector_size);
 
 for i=2:length(waypoints)
 	p0 = waypoints{i-1}{1};
 	pf = waypoints{i}{1};
 	t0 = waypoints{i-1}{2};
 	tf = waypoints{i}{2};
-	[trajectory, velocity] = make_segment(t, t0, tf, p0, pf, trajectory, velocity);
+	[desired.trajectory, desired.ned_velocity] = make_segment(t, t0, tf, p0, pf, desired.trajectory, desired.ned_velocity);
 end
 
-x = trajectory(:, 1);
-y = trajectory(:, 2);
-z = trajectory(:, 3);
-psi = trajectory(:, 4);
+desired.pose = desired.trajectory;
+desired.line_spec = 'r';
+desired.line_width = 1.5;
 
-figure("Name", "bluerov-3d-trajectory")
-plot_3d_robot_path(x', y', z', 'r', 1.5)
+desired.body_fixed_vel(:, 1) = zeros(size(desired.ned_velocity, 1), 1);
+desired.body_fixed_vel(:, 2) = zeros(size(desired.ned_velocity, 1), 1);
+desired.body_fixed_vel(:, 3) = desired.ned_velocity(:, 3);
+desired.body_fixed_vel(:, 4) = desired.ned_velocity(:, 4);
 
-time_points = [10 15 25 30 40 45 55 60];
-time_labels = {'t_1', 't_2', 't_3', 't_4', 't_5', 't_6', 't_7', 't_8'};
-
-figure("Name", "Position and Attitude in NED frame")
-subplot(4, 1, 1)
-plot_states(t, x, 'x [m]')
-plot_time_labels(time_points, time_labels, is_to_plot_time_labels)
-
-subplot(4, 1, 2)
-plot_states(t, y, 'y [m]')
-plot_time_labels(time_points, time_labels, is_to_plot_time_labels)
-
-subplot(4, 1, 3)
-plot_states(t, z, 'z [m]')
-plot_time_labels(time_points, time_labels, is_to_plot_time_labels)
-
-subplot(4, 1, 4)
-plot_states(t, rad2deg(psi), '\psi [deg]')
-plot_time_labels(time_points, time_labels, is_to_plot_time_labels)
-
-xlabel('Time [s]')
-
-x_dot = velocity(:, 1);
-y_dot = velocity(:, 2);
-z_dot = velocity(:, 3);
-psi_dot = velocity(:, 4);
-
-fig = figure("Name", "Position and Velocity in NED frame");
-left_color = [1 0 0];  % Red
-right_color = [0 0 1];  % Blue
-set(fig,'defaultAxesColorOrder',[left_color; right_color]);
-
-subplot(4, 1, 1)
-plot_pose_and_velocity(t, x, x_dot, 'x', '\dot{x}');
-subplot(4, 1, 2)
-plot_pose_and_velocity(t, y, y_dot, 'y', '\dot{y}');
-subplot(4, 1, 3)
-plot_pose_and_velocity(t, z, z_dot, 'z', '\dot{z}');
-subplot(4, 1, 4)
-plot_pose_and_velocity(t, psi, psi_dot, '\psi', '\dot{\psi}');
-
-figure("Name", "Velocities in NED frame")
-subplot(4, 1, 1)
-plot(t, x_dot, 'r', 'LineWidth', 1.5)
-ylabel('$\dot{x}$ [m/s]', 'Interpreter', 'latex')
-grid on
-subplot(4, 1, 2)
-plot(t, y_dot, 'r', 'LineWidth', 1.5)
-ylabel('$\dot{y}$ [m/s]', 'Interpreter', 'latex')
-grid on
-subplot(4, 1, 3)
-plot(t, z_dot, 'r', 'LineWidth', 1.5)
-ylabel('$\dot{z}$ [m/s]', 'Interpreter', 'latex')
-grid on
-subplot(4, 1, 4)
-plot(t, psi_dot, 'r', 'LineWidth', 1.5)
-xlabel('Tempo [s]')
-ylabel('$\dot{\psi}$ [rad/s]', 'Interpreter', 'latex')
-grid on
-
-x_dot_rotated = zeros(size(x_dot));
-y_dot_rotated = zeros(size(y_dot));
-z_dot_rotated = z_dot;  % z_dot is the same in both frames because there is rotation only in the x-y plane
-psi_filtered = lsim(nominal_model.pos_ref_tf.psi, psi, t);
+x_dot = desired.ned_velocity(:, 1);
+y_dot = desired.ned_velocity(:, 2);
+yaw = desired.trajectory(:, 4);
 
 for i = 1:length(x_dot)
-	x_dot_rotated(i) = (x_dot(i) * cos(-psi(i))) - (y_dot(i) * sin(-psi(i)));
-	y_dot_rotated(i) = (x_dot(i) * sin(-psi(i))) + (y_dot(i) * cos(-psi(i)));
+	desired.body_fixed_vel(i, 1) = (x_dot(i) * cos(-yaw(i))) - (y_dot(i) * sin(-yaw(i)));
+	desired.body_fixed_vel(i, 2) = (x_dot(i) * sin(-yaw(i))) + (y_dot(i) * cos(-yaw(i)));
 end
 
-figure("Name", "Velocities in body-fixed frame")
-subplot(4, 1, 1)
-plot(t, x_dot_rotated, 'r', 'LineWidth', 1.5)
-ylabel('u [m/s]')
-grid on
-subplot(4, 1, 2)
-plot(t, y_dot_rotated, 'r', 'LineWidth', 1.5)
-ylabel('v [m/s]')
-grid on
-subplot(4, 1, 3)
-plot(t, z_dot, 'r', 'LineWidth', 1.5)
-ylabel('w [m/s]')
-grid on
-subplot(4, 1, 4)
-plot(t, psi_dot, 'r', 'LineWidth', 1.5)
-xlabel('Time [s]')
-ylabel('r [rad/s]')
-grid on
+figure("Name", "desired-3d-path")
+plot_3d_path(desired)
+
+figure("Name", "desired-trajectory")
+desired_trajectory_args.y_labels = {'x [m]', 'y [m]', 'z [m]', '\psi [rad]'};
+desired_trajectory_args.y_min_offset = 0.1;
+desired_trajectory_args.y_max_offset = 0.1;
+plot_per_dof_values(t, desired_trajectory_args, desired.trajectory)
+
+figure("Name", "pose-and-ned-velocities");
+plot_pose_and_ned_velocity(t, desired.trajectory, desired.ned_velocity)
+
+figure("Name", "velocities-in-ned-frame")
+desired_ned_vel_args.y_labels = {'$\dot{x}$ [m/s]', '$\dot{y}$ [m/s]', '$\dot{z}$ [m/s]', '$\dot{\psi}$ [rad/s]'};
+desired_ned_vel_args.y_min_offset = 0.1;
+desired_ned_vel_args.y_max_offset = 0.1;
+plot_per_dof_values(t, desired_ned_vel_args, desired.ned_velocity)
+
+figure("Name", "velocities-in-body-fixed-frame")
+desired_body_fixed_vel_args.y_labels = {'u [m/s]', 'v [m/s]', 'w [m/s]', 'r [rad/s]'};
+desired_body_fixed_vel_args.y_min_offset = 0.1;
+desired_body_fixed_vel_args.y_max_offset = 0.1;
+plot_per_dof_values(t, desired_body_fixed_vel_args, desired.body_fixed_vel)
 
 function s = create_s()
 	s = tf('s');
@@ -176,52 +122,48 @@ function [G_pos, G_vel] = getDiscreteRefenceModelTf(ksi, wn, sampling_period)
 	G_vel = c2d(s*G, sampling_period, 'tustin');  % s*G is used to get the velocity reference model
 end
 
-function plot_states(t, pos_or_attitude, ylabel_name)
-	plot(t, pos_or_attitude, 'LineWidth', 1.5, 'Color', 'r')
-	ylim([min(pos_or_attitude) max(pos_or_attitude)+0.1])
-	ylabel(ylabel_name)
-	grid on
-end
-
-function plot_pose_and_velocity(t, pos_or_attitude, pos_or_attitude_dot, label1, label2)
+function plot_two_arrays_in_same_chart(t, array_with_left_label, array_with_right_label, label1, label2)
 	yyaxis left
 	title(['$' label1 '$ and $' label2 '$ in NED frame'], 'Interpreter', 'latex');
-	plot(t, pos_or_attitude, 'LineWidth', 1.5)
-	ylim([min(pos_or_attitude) max(pos_or_attitude)+0.1])
+	plot(t, array_with_left_label, '-r', 'LineWidth', 1.5)
+	ylim([(min(array_with_left_label) - 0.1) (max(array_with_left_label) + 0.1)])
 	ylabel([label1 '(t) [m]'])
 
 	yyaxis right
-	plot(t, pos_or_attitude_dot, 'LineWidth', 1.5)
+	plot(t, array_with_right_label, '-b', 'LineWidth', 1.5)
 	ylabel(['$\dot{' label1 '}(t)$ [$ms^{-1}$]'], 'Interpreter', 'latex')
-	ylim([min(pos_or_attitude_dot)-0.1 max(pos_or_attitude_dot)+0.1])
+	ylim([(min(array_with_right_label) - 0.1) (max(array_with_right_label) + 0.1)])
+	xlim([min(t) max(t)])
 
 	legend({['$' label1 '$'], ['$\dot{' label1 '}$']}, 'Interpreter', 'latex')
 	grid on
 end
 
-function plot_time_labels(time_points, time_labels, is_to_plot_time_labels)
-	if ~is_to_plot_time_labels
-		return
-	end
+function plot_pose_and_ned_velocity(t, pose, velocity)
+	left_color = [1 0 0];  % Red
+	right_color = [0 0 1];  % Blue
+	set(gca, 'defaultAxesColorOrder',[left_color; right_color]);
 
-	hold on
-	for i = 1:length(time_points)
-		xline(time_points(i), '--k', time_labels{i}, 'LabelOrientation', 'horizontal', 'LabelVerticalAlignment', 'middle')
-	end
-	hold off
-end
+	x = pose(:, 1);
+	y = pose(:, 2);
+	z = pose(:, 3);
+	yaw = pose(:, 4);
 
-function plot_3d_robot_path(x, y, z, line_color, line_width)
-	plot3(x(1,:), y(1,:), z(1,:), line_color, 'linewidth', line_width)
-	[x_min, x_max] = get_axis_limits(x, 0.1);
-	[y_min, y_max] = get_axis_limits(y, 0.1);
-	[z_min, z_max] = get_axis_limits(z, 0.1);
-	grid on
-	axis([x_min, x_max, y_min, y_max, z_min, z_max])
-	set(gca, 'ZDir', 'reverse')
-	xlabel('x [m]')
-	ylabel('y [m]')
-	zlabel('z [m]')
+	x_dot = velocity(:, 1);
+	y_dot = velocity(:, 2);
+	z_dot = velocity(:, 3);
+	yaw_dot = velocity(:, 4);
+
+	subplot(4, 1, 1)
+	plot_two_arrays_in_same_chart(t, x, x_dot, 'x', '\dot{x}');
+	subplot(4, 1, 2)
+	plot_two_arrays_in_same_chart(t, y, y_dot, 'y', '\dot{y}');
+	subplot(4, 1, 3)
+	plot_two_arrays_in_same_chart(t, z, z_dot, 'z', '\dot{z}');
+	subplot(4, 1, 4)
+	plot_two_arrays_in_same_chart(t, yaw, yaw_dot, '\psi', '\dot{\psi}');
+
+	xlabel('Time [s]')
 end
 
 function [pose, pose_deriv] = make_segment(t, t0, tf, p0, pf, pose, pose_deriv)
