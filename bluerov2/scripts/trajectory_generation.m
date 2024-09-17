@@ -14,6 +14,8 @@ run bluerov2_models
 
 state_vector_size = size(nominal_model.discrete_state_space.Ad, 1);
 
+is_to_plot_generated_trajectory = false;
+
 waypoints = {
 	{[0 0 5   0  ],  0};
 	{[1 0 5   0  ], 10};
@@ -34,7 +36,9 @@ for i=2:length(waypoints)
 	pf = waypoints{i}{1};
 	t0 = waypoints{i-1}{2};
 	tf = waypoints{i}{2};
-	[desired.trajectory, desired.ned_velocity] = make_segment(t, t0, tf, p0, pf, desired.trajectory, desired.ned_velocity, 'lspb');
+	[desired.trajectory, desired.ned_velocity] = make_segment(t, t0, tf, p0, pf, ...
+																														desired.trajectory, ...
+																														desired.ned_velocity, 'lspb');
 end
 
 desired.pose = desired.trajectory;
@@ -55,29 +59,31 @@ for i = 1:length(x_dot)
 	desired.body_fixed_vel(i, 2) = (x_dot(i) * sin(-yaw_d(i))) + (y_dot(i) * cos(-yaw_d(i)));
 end
 
-figure("Name", "desired-3d-path")
-plot_3d_path(desired)
+if is_to_plot_generated_trajectory
+	figure("Name", "desired-3d-path")
+	plot_3d_path(desired)
 
-figure("Name", "desired-trajectory")
-desired_trajectory_args.y_labels = {'x [m]', 'y [m]', 'z [m]', '\psi [rad]'};
-desired_trajectory_args.y_min_offset = 0.1;
-desired_trajectory_args.y_max_offset = 0.1;
-plot_per_dof_values(t, desired_trajectory_args, desired.trajectory)
+	figure("Name", "desired-trajectory")
+	desired_trajectory_args.y_labels = {'x [m]', 'y [m]', 'z [m]', '\psi [rad]'};
+	desired_trajectory_args.y_min_offset = 0.1;
+	desired_trajectory_args.y_max_offset = 0.1;
+	plot_per_dof_values(t, desired_trajectory_args, desired.trajectory)
 
-figure("Name", "pose-and-ned-velocities");
-plot_pose_and_ned_velocity(t, desired.trajectory, desired.ned_velocity)
+	figure("Name", "pose-and-ned-velocities");
+	plot_pose_and_ned_velocity(t, desired.trajectory, desired.ned_velocity)
 
-figure("Name", "velocities-in-ned-frame")
-desired_ned_vel_args.y_labels = {'$\dot{x}$ [m/s]', '$\dot{y}$ [m/s]', '$\dot{z}$ [m/s]', '$\dot{\psi}$ [rad/s]'};
-desired_ned_vel_args.y_min_offset = 0.1;
-desired_ned_vel_args.y_max_offset = 0.1;
-plot_per_dof_values(t, desired_ned_vel_args, desired.ned_velocity)
+	figure("Name", "velocities-in-ned-frame")
+	desired_ned_vel_args.y_labels = {'$\dot{x}$ [m/s]', '$\dot{y}$ [m/s]', '$\dot{z}$ [m/s]', '$\dot{\psi}$ [rad/s]'};
+	desired_ned_vel_args.y_min_offset = 0.1;
+	desired_ned_vel_args.y_max_offset = 0.1;
+	plot_per_dof_values(t, desired_ned_vel_args, desired.ned_velocity)
 
-figure("Name", "velocities-in-body-fixed-frame")
-desired_body_fixed_vel_args.y_labels = {'u [m/s]', 'v [m/s]', 'w [m/s]', 'r [rad/s]'};
-desired_body_fixed_vel_args.y_min_offset = 0.1;
-desired_body_fixed_vel_args.y_max_offset = 0.1;
-plot_per_dof_values(t, desired_body_fixed_vel_args, desired.body_fixed_vel)
+	figure("Name", "velocities-in-body-fixed-frame")
+	desired_body_fixed_vel_args.y_labels = {'u [m/s]', 'v [m/s]', 'w [m/s]', 'r [rad/s]'};
+	desired_body_fixed_vel_args.y_min_offset = 0.1;
+	desired_body_fixed_vel_args.y_max_offset = 0.1;
+	plot_per_dof_values(t, desired_body_fixed_vel_args, desired.body_fixed_vel)
+end
 
 function plot_two_arrays_in_same_chart(t, array_with_left_label, array_with_right_label, label1, label2)
 	yyaxis left

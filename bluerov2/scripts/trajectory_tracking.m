@@ -30,7 +30,7 @@ dynamic_model.gravity_vector = [0; 0; z_restoring_force; 0];
 integration_step_ratio = 50;
 integration_step_size = sampling_period/integration_step_ratio;
 
-simulation_time = total_time + 2.0;
+simulation_time = total_time;
 end_time = ceil(simulation_time/sampling_period)*sampling_period;
 
 time = 0:integration_step_size:simulation_time;
@@ -38,7 +38,7 @@ num_of_simulation_steps = length(time);
 sim_time = zeros(1, num_of_simulation_steps);
 
 num_of_samples = ceil(simulation_time/sampling_period);
-samples_delayed = 0;
+samples_delayed = 10;
 %===================================================================================================
 % End of simulation parameters section
 %===================================================================================================
@@ -83,7 +83,7 @@ params.current_time_step = 1;
 params.navigation_velocity = 0.1;
 
 waypoints = generate_square_trajectory(1, params.navigation_velocity, sampling_period);
-vel_ref = [x_dot_rotated'; y_dot_rotated'; z_dot'; psi_dot'];
+vel_ref = desired.body_fixed_vel;
 %===================================================================================================
 % End of MPC Tunning and Initialization section
 %===================================================================================================
@@ -167,6 +167,7 @@ end
 
 % body_fixed_vel(:, 1) is the initial condition, so we remove it
 body_fixed_vel = body_fixed_vel(:, 2:end);
+body_fixed_vel_sampled = body_fixed_vel_sampled(:, 2:end);
 position_and_attitude = position_and_attitude(:, 2:end);
 ned_velocities = ned_velocities(:, 2:end);
 generalized_forces = generalized_forces(:, 2:end);
@@ -179,26 +180,21 @@ generalized_forces = generalized_forces(:, 2:end);
 % Charts
 %===================================================================================================
 figure("Name", "bluerov-states")
-plot_bluerov_states(sim_time, body_fixed_vel, '-r', line_thickness)
-
-figure("Name", "NED Velocities");
-plot_bluerov_states(sim_time, ned_velocities, '-r', line_thickness)
+figure("Name", "velocities-in-body-fixed-frame")
+desired_body_fixed_vel_args.y_labels = {'u [m/s]', 'v [m/s]', 'w [m/s]', 'r [rad/s]'};
+desired_body_fixed_vel_args.y_min_offset = 0.1;
+desired_body_fixed_vel_args.y_max_offset = 0.1;
+plot_per_dof_values(t, desired_body_fixed_vel_args, desired.body_fixed_vel, body_fixed_vel_sampled')
 
 figure("Name", "bluerov-control-signals")
 plot_generalized_forces(sim_time, generalized_forces, -1, '-r', line_thickness)
 
-x_n = position_and_attitude(1,:);
-y_n = position_and_attitude(2,:);
-z_n = position_and_attitude(3,:);
-yaw = position_and_attitude(4,:);
-
-figure("Name", "Position and Attitude in NED frame")
-plot_individual_position_and_attitude(sim_time, x_n, y_n, z_n, yaw);
+actual.pose = position_and_attitude';
+actual.line_spec = '-b';
+actual.line_width = line_thickness;
 
 figure("Name", "bluerov-3d-trajectory")
-plot_3d_robot_path(x_n, y_n, z_n, '-r', line_thickness);
-hold on
-plot_3d_robot_path(x, y, z, '--k', 1.0);
+plot_3d_path(desired, actual)
 % %===================================================================================================
 % End of charts
 %===================================================================================================
@@ -218,47 +214,6 @@ function ned_vel = body_fixed_to_inertial_frame(body_fixed_vel, arg)
 	ned_vel = body_fixed_to_ned_rot*body_fixed_vel;
 end
 
-function horizon_refs = get_vel_horizon_refs(current_pose, waypoints, const_param)
-	% Future references must be in Y = [yr(k) yr(k+1) ... yr(k+N-1)]
-	state_vector_size = const_param.state_vector_size;
-	nav_vel = const_param.navigation_velocity;
-	k = const_param.current_time_step;
-	Np = const_param.prediction_horizon;
-
-	horizon_refs = zeros(Np*state_vector_size,1);
-	x=current_pose(1);
-	y=current_pose(2);
-	z=current_pose(3);
-	psi=current_pose(4);
-
-	i=1;
-	for j=k:k+Np-1
-			if j > length(waypoints)
-					x_ref = waypoints(1,end);
-					y_ref = waypoints(2,end);
-					z_ref = waypoints(3,end);
-					psi_ref = waypoints(4,end);
-					beta = deg2rad(-90);
-			else
-					x_ref = waypoints(1,j);
-					y_ref = waypoints(2,j);
-					z_ref = waypoints(3,j);
-					psi_ref = waypoints(4,j);
-					beta = atan2(y_ref-y, x_ref-x);  % atan2(yr(k + j|k) - yr(k), xr(k + j|k) − xr(k))
-			end
-
-			Rz = [cos(psi_ref) sin(psi_ref) 0 0; ...
-					 -sin(psi_ref) cos(psi_ref) 0 0; ...
-					 	     0 					 0 				1	0; ...
-						     0					 0				0	1];
-
-			temp_vec = [nav_vel*cos(beta) nav_vel*sin(beta) 0 (psi_ref-psi)]';
-			temp_vec = Rz*temp_vec;
-			horizon_refs(i:i+state_vector_size-1,1) = temp_vec;
-			i=i+state_vector_size;
-	end
-end
-
 function horizon_vel_ref = generate_horizon_vel_ref(vel_trajectory, const_param)
 	state_vector_size = const_param.state_vector_size;
 	k = const_param.current_time_step;
@@ -269,9 +224,9 @@ function horizon_vel_ref = generate_horizon_vel_ref(vel_trajectory, const_param)
 	i=1;
 	for j=k:k+Np-1
 			if j > length(vel_trajectory)
-				temp_vec = [vel_trajectory(1,end); vel_trajectory(2,end); vel_trajectory(3,end); vel_trajectory(4,end)];
+				temp_vec = [vel_trajectory(end, 1); vel_trajectory(end, 2); vel_trajectory(end, 3); vel_trajectory(end, 4)];
 			else
-				temp_vec = [vel_trajectory(1,j); vel_trajectory(2,j); vel_trajectory(3,j); vel_trajectory(4,j)];
+				temp_vec = [vel_trajectory(j,1); vel_trajectory(j,2); vel_trajectory(j,3); vel_trajectory(j,4)];
 			end
 			horizon_vel_ref(i:i+state_vector_size-1,1) = temp_vec;
 			i=i+state_vector_size;
@@ -363,39 +318,4 @@ function plot_generalized_forces (t, u, legend_name, line_spec, line_thickness, 
 			title('Generalized forces (control signals)')
 		end
 	end
-end
-
-function plot_states(t, pos_or_attitude, ylabel_name)
-	plot(t, pos_or_attitude, 'LineWidth', 1.5, 'Color', 'r')
-	ylim([min(pos_or_attitude) max(pos_or_attitude)+0.1])
-	ylabel(ylabel_name)
-	grid on
-end
-
-function plot_3d_robot_path(x, y, z, line_color, line_width)
-	plot3(x(1,:), y(1,:), z(1,:), line_color, 'linewidth', line_width)
-	[x_min, x_max] = get_axis_limits(x, 0.1);
-	[y_min, y_max] = get_axis_limits(y, 0.1);
-	[z_min, z_max] = get_axis_limits(z, 0.1);
-	z_min = 0;
-	grid on
-	axis([x_min, x_max, y_min, y_max, z_min, z_max])
-	set(gca, 'ZDir', 'reverse')
-	xlabel('x [m]')
-	ylabel('y [m]')
-	zlabel('z [m]')
-end
-
-function plot_individual_position_and_attitude(t, x, y, z, yaw)
-	subplot(4, 1, 1)
-	plot_states(t, x, 'x [m]')
-
-	subplot(4, 1, 2)
-	plot_states(t, y, 'y [m]')
-
-	subplot(4, 1, 3)
-	plot_states(t, z, 'z [m]')
-
-	subplot(4, 1, 4)
-	plot_states(t, rad2deg(yaw), '\psi [deg]')
 end
