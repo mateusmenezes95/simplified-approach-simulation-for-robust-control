@@ -65,7 +65,7 @@ for i=2:length(waypoints)
 	pf = waypoints{i}{1};
 	t0 = waypoints{i-1}{2};
 	tf = waypoints{i}{2};
-	[desired.trajectory, desired.ned_velocity] = make_segment(t, t0, tf, p0, pf, desired.trajectory, desired.ned_velocity);
+	[desired.trajectory, desired.ned_velocity] = make_segment(t, t0, tf, p0, pf, desired.trajectory, desired.ned_velocity, 'lspb');
 end
 
 desired.pose = desired.trajectory;
@@ -79,11 +79,11 @@ desired.body_fixed_vel(:, 4) = desired.ned_velocity(:, 4);
 
 x_dot = desired.ned_velocity(:, 1);
 y_dot = desired.ned_velocity(:, 2);
-yaw = desired.trajectory(:, 4);
+yaw_d = desired.trajectory(:, 4);
 
 for i = 1:length(x_dot)
-	desired.body_fixed_vel(i, 1) = (x_dot(i) * cos(-yaw(i))) - (y_dot(i) * sin(-yaw(i)));
-	desired.body_fixed_vel(i, 2) = (x_dot(i) * sin(-yaw(i))) + (y_dot(i) * cos(-yaw(i)));
+	desired.body_fixed_vel(i, 1) = (x_dot(i) * cos(-yaw_d(i))) - (y_dot(i) * sin(-yaw_d(i)));
+	desired.body_fixed_vel(i, 2) = (x_dot(i) * sin(-yaw_d(i))) + (y_dot(i) * cos(-yaw_d(i)));
 end
 
 figure("Name", "desired-3d-path")
@@ -128,22 +128,22 @@ function plot_two_arrays_in_same_chart(t, array_with_left_label, array_with_righ
 	plot(t, array_with_left_label, '-r', 'LineWidth', 1.5)
 	ylim([(min(array_with_left_label) - 0.1) (max(array_with_left_label) + 0.1)])
 	ylabel([label1 '(t) [m]'])
+	ax = gca;
+	ax.YColor = 'r';
 
 	yyaxis right
 	plot(t, array_with_right_label, '-b', 'LineWidth', 1.5)
 	ylabel(['$\dot{' label1 '}(t)$ [$ms^{-1}$]'], 'Interpreter', 'latex')
 	ylim([(min(array_with_right_label) - 0.1) (max(array_with_right_label) + 0.1)])
 	xlim([min(t) max(t)])
+	ax = gca;
+	ax.YColor = 'b';
 
 	legend({['$' label1 '$'], ['$\dot{' label1 '}$']}, 'Interpreter', 'latex')
 	grid on
 end
 
 function plot_pose_and_ned_velocity(t, pose, velocity)
-	left_color = [1 0 0];  % Red
-	right_color = [0 0 1];  % Blue
-	set(gca, 'defaultAxesColorOrder',[left_color; right_color]);
-
 	x = pose(:, 1);
 	y = pose(:, 2);
 	z = pose(:, 3);
@@ -166,35 +166,50 @@ function plot_pose_and_ned_velocity(t, pose, velocity)
 	xlabel('Time [s]')
 end
 
-function [pose, pose_deriv] = make_segment(t, t0, tf, p0, pf, pose, pose_deriv)
+function [pose, pose_deriv] = make_segment(t, t0, tf, p0, pf, pose, pose_deriv, traj_gen)
 % MAKE_SEGMENT Generates a segment of a trajectory
 %
-%   [pose, pose_deriv, tf] = MAKE_SEGMENT(t, t0, p0, pf, vel, pose, pose_deriv)
+%   [pose, pose_deriv] = MAKE_SEGMENT(t, t0, tf, p0, pf, pose, pose_deriv, traj_gen)
 %   generates a segment of a trajectory from an initial position p0 to a
-%   final position pf with a given velocity vel. The function updates the
-%   pose and pose_deriv arrays with the new segment and returns the updated
-%   arrays along with the final time tf for the segment.
+%   final position pf using a specified trajectory generation method. The
+%   function updates the pose and pose_deriv arrays with the new segment
+%   and returns the updated arrays.
 %
 %   Inputs:
 %       t - Time vector
 %       t0 - Initial time for the segment
+%       tf - Final time for the segment
 %       p0 - Initial position for the segment
 %       pf - Final position for the segment
-%       vel - Velocity array for the segment
 %       pose - Array to store the positions of the trajectory
 %       pose_deriv - Array to store the velocities of the trajectory
+%       traj_gen - Trajectory generation method ('lspb' or 'tpoly')
 %
 %   Outputs:
 %       pose - Updated array with the positions of the trajectory
 %       pose_deriv - Updated array with the velocities of the trajectory
-%       tf - Final time for the segment
 
-    % Calculate the final time for the segment
-		vel = (pf - p0) ./ (tf - t0);
-		idx = find(t >= t0 & t < tf);
+    % Calculate the indices for the time range
+    idx = find(t >= t0 & t <= tf);
 
-		for i = 1:length(idx)
-			pose(idx(i), :) = p0 + vel * (t(idx(i)) - t0);
-			pose_deriv(idx(i), :) = vel;
-		end
+    % Initialize arrays for position, velocity, and acceleration
+    s = zeros(length(idx), length(p0));
+    sd = zeros(length(idx), length(p0));
+    sdd = zeros(length(idx), length(p0));
+
+    % Select the trajectory generation function
+    if traj_gen == "lspb"
+        traj_gen_function = @lspb;
+    elseif traj_gen == "tpoly"
+        traj_gen_function = @tpoly;
+    end
+
+    % Generate the trajectory for each dimension
+    for j = 1:length(p0)
+        [s(:, j), sd(:, j), sdd(:, j)] = traj_gen_function(p0(j), pf(j), t(idx) - t0);
+        for i = 1:length(idx)
+            pose(idx(i), j) = s(i, j);
+            pose_deriv(idx(i), j) = sd(i, j);
+        end
+    end
 end
