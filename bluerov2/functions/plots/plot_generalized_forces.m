@@ -23,9 +23,19 @@ function plot_generalized_forces (t, u, legend_name, line_spec, line_thickness, 
     end
 
 		ylim([(min(u(i,:)) - limit_offset) (max(u(i,:)) + limit_offset)])
+		xlim([min(t) max(t)])
 
-		if i == 1
-			title('Generalized forces (control signals)')
-		end
+		ax = gca;
+		outerpos = ax.OuterPosition;
+		ti = ax.TightInset; 
+		left = outerpos(1) + ti(1);
+		bottom = outerpos(2) + ti(2);
+		ax_width = outerpos(3) - ti(1) - ti(3) - 0.01;
+		ax_height = outerpos(4) - ti(2) - ti(4);
+		ax.Position = [left bottom ax_width ax_height];
+
+		% if i == 1
+		% 	title('Generalized forces (control signals)')
+		% end
 	end
 end

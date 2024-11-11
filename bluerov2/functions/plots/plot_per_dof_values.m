@@ -31,6 +31,14 @@ function plot_per_dof_values(t, args, desired_values, actual_values)
 			xlim([min(t) max(t)])
 			ylim([y_min y_max])
 			grid on
+			ax = gca;
+			outerpos = ax.OuterPosition;
+			ti = ax.TightInset; 
+			left = outerpos(1) + ti(1);
+			bottom = outerpos(2) + ti(2);
+			ax_width = outerpos(3) - ti(1) - ti(3) - 0.01;
+			ax_height = outerpos(4) - ti(2) - ti(4);
+			ax.Position = [left bottom ax_width ax_height];
 		end
 		xlabel('Time [s]')
 	end
