@@ -25,7 +25,7 @@ function plot_3d_path(desired, actual)
 		plot3(actual_x, actual_y, actual_z, actual.line_spec, 'LineWidth', actual.line_width)
 		hold off
 
-		legend('Desired', 'Actual')
+		legend('Desired', 'Actual', 'Location', 'best')
 
 		[actual_x_min, actual_x_max] = get_axis_limits(actual_x, 0.1);
 		[actual_y_min, actual_y_max] = get_axis_limits(actual_y, 0.1);

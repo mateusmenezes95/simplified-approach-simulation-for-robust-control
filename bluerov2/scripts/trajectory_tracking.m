@@ -38,7 +38,7 @@ num_of_simulation_steps = length(time);
 sim_time = zeros(1, num_of_simulation_steps);
 
 num_of_samples = ceil(simulation_time/sampling_period);
-samples_delayed = 10;
+samples_delayed = 14;
 %===================================================================================================
 % End of simulation parameters section
 %===================================================================================================
@@ -50,6 +50,7 @@ font_size = 10;
 line_thickness = 1.5;
 y_axis_limits_offset = 0.2;
 figure_idx = 1;
+save_graph_flag = false;
 %==============================================================================
 
 %===================================================================================================
@@ -59,10 +60,10 @@ Aaug = dynamic_model.augmented_state_space.Aaug;
 Baug = dynamic_model.augmented_state_space.Baug;
 Caug = dynamic_model.augmented_state_space.Caug;
 
-surge.q = 8000;
+surge.q = 7500;
 surge.r = 200;
 
-sway.q = 9000;
+sway.q = 7500;
 sway.r = 200;
 
 heave.q = 7500;
@@ -76,6 +77,8 @@ r = diag([surge.r, sway.r, heave.r, yaw.r]);
 
 [Acal, Bcal, Ccal] = preditor_params(Aaug, Baug, Caug, prediction_horizon, control_horizon);
 [kw, kmpc, Q, R] = get_mpc_gains_non_scalar_qr(Acal, Bcal, Ccal, q, r, prediction_horizon, control_horizon);
+kmpc = kmpc(1:state_vector_size,:);
+kw = kw(1:state_vector_size, :);
 
 params.state_vector_size = state_vector_size;
 params.prediction_horizon = prediction_horizon;
@@ -100,6 +103,7 @@ position_and_attitude_sampled = zeros(state_vector_size, num_of_samples+1);
 position_and_attitude_sampled(:, 1) = position_and_attitude(:, 1);
 
 ned_velocities = zeros(state_vector_size, num_of_simulation_steps+1);
+ned_velocities_sampled = zeros(num_of_samples+1, state_vector_size);
 
 generalized_forces = zeros(state_vector_size, num_of_simulation_steps+1);
 generalized_forces_sampled = zeros(state_vector_size, num_of_samples+1);
@@ -143,6 +147,10 @@ for i=1:num_of_simulation_steps
 			control_signal(:, k) = delta_u(1:state_vector_size,1);
 		end
 
+		position_and_attitude_sampled(:, k) = position_and_attitude(:, i);
+		ned_velocities_sampled(k, :) = ned_velocities(:, i);
+		generalized_forces_sampled(:, k) = generalized_forces(:, i);
+
 		k = k + 1;
 	end
 
@@ -168,9 +176,17 @@ end
 % body_fixed_vel(:, 1) is the initial condition, so we remove it
 body_fixed_vel = body_fixed_vel(:, 2:end);
 body_fixed_vel_sampled = body_fixed_vel_sampled(:, 2:end);
+
 position_and_attitude = position_and_attitude(:, 2:end);
+position_and_attitude_sampled = position_and_attitude_sampled(:, 2:end);
+
 ned_velocities = ned_velocities(:, 2:end);
+ned_velocities_sampled = ned_velocities_sampled(2:end, :);
+
 generalized_forces = generalized_forces(:, 2:end);
+generalized_forces_sampled = generalized_forces_sampled(:, 2:end);
+
+rmse = calculate_rmse(desired.trajectory, position_and_attitude_sampled');
 
 %===================================================================================================
 % End of simulation loop
@@ -179,22 +195,39 @@ generalized_forces = generalized_forces(:, 2:end);
 %===================================================================================================
 % Charts
 %===================================================================================================
-figure("Name", "bluerov-states")
-figure("Name", "velocities-in-body-fixed-frame")
+fig_name_suffix = "-" + num2str(samples_delayed) + "-samples-delayed";
+figure("Name", "desired-versus-actual-trajectory-with" + fig_name_suffix)
+desired_trajectory_args.y_labels = {'x [m]', 'y [m]', 'z [m]', '$\psi$ [rad]'};
+desired_trajectory_args.y_min_offset = 0.1;
+desired_trajectory_args.y_max_offset = 0.1;
+plot_per_dof_values(t, desired_trajectory_args, desired.trajectory, position_and_attitude_sampled')
+save_graph(save_graph_flag, base_path_for_fig_save)
+
+figure("Name", "velocities-in-body-fixed-frame" + fig_name_suffix)
 desired_body_fixed_vel_args.y_labels = {'u [m/s]', 'v [m/s]', 'w [m/s]', 'r [rad/s]'};
 desired_body_fixed_vel_args.y_min_offset = 0.1;
 desired_body_fixed_vel_args.y_max_offset = 0.1;
 plot_per_dof_values(t, desired_body_fixed_vel_args, desired.body_fixed_vel, body_fixed_vel_sampled')
+save_graph(save_graph_flag, base_path_for_fig_save)
 
-figure("Name", "bluerov-control-signals")
-plot_generalized_forces(sim_time, generalized_forces, -1, '-r', line_thickness)
+figure("Name", "bluerov-control-signals" + fig_name_suffix)
+bluerov_control_signals_args.y_labels = {'$X$ [N]', '$Y$ [N]', '$Z$ [N]', '$N$ [Nm]'};
+bluerov_control_signals_args.y_min_offset = 1.0;
+bluerov_control_signals_args.y_max_offset = 1.0;
+plot_per_dof_values(t, bluerov_control_signals_args, control_signal(:, 2:end)')
+save_graph(save_graph_flag, base_path_for_fig_save)
 
 actual.pose = position_and_attitude';
 actual.line_spec = '-b';
 actual.line_width = line_thickness;
 
-figure("Name", "bluerov-3d-trajectory")
+desired.pose = desired.trajectory;
+desired.line_spec = '--r';
+desired.line_width = 1.5;
+
+figure("Name", "bluerov-3d-trajectory" + fig_name_suffix)
 plot_3d_path(desired, actual)
+save_graph(save_graph_flag, base_path_for_fig_save)
 % %===================================================================================================
 % End of charts
 %===================================================================================================
@@ -255,39 +288,6 @@ function waypoints = generate_square_trajectory(square_size, nav_vel, sampling_p
   waypoints = [x y z theta]';
 end
 
-function plot_bluerov_states(t, x, line_spec, line_thickness)
-  states_name = {'u', 'v', 'w', 'r'};
-  num_states = size(states_name, 2);
-	limit_offset = 0.05;
-
-  for i=1:num_states
-    subplot(num_states, 1, i)
-
-    hold on
-    plot(t, x(i,:), line_spec, 'linewidth', line_thickness, 'DisplayName', ['velocity ' states_name{i}])
-    hold off
-    legend('show', 'location', 'northeast')
-
-    grid on
-    xlabel('Time [s]');
-    if i < num_states
-      ylabel([states_name{i} ' [m/s]']);
-    else
-      ylabel([states_name{i} ' [rad/s]']);
-    end
-
-    min_value = min(x(i,:));
-    max_value = max(x(i,:));
-
-		ylim([(min_value - limit_offset) (max_value + limit_offset)])
-
-		if i == 1
-			title('Body-fixed velocities (robot states)')
-		end
-
-  end
-end
-
 function plot_generalized_forces (t, u, legend_name, line_spec, line_thickness, ylabel_prefix)
 	generalized_forces_name = {'X', 'Y', 'Z', 'N'}; % According to SNAME notation
 	control_signals = size(generalized_forces_name, 2);
@@ -317,5 +317,16 @@ function plot_generalized_forces (t, u, legend_name, line_spec, line_thickness, 
 		if i == 1
 			title('Generalized forces (control signals)')
 		end
+	end
+end
+
+function rmse = calculate_rmse(desired, actual)
+	rmse = zeros(1, size(desired, 2));
+	for i=1:size(desired, 2)
+		sum = 0;
+		for j=1:size(desired, 1)
+			sum = sum + (desired(j, i) - actual(j, i))^2;
+		end
+		rmse(i) = sqrt(sum/size(desired, 1));
 	end
 end

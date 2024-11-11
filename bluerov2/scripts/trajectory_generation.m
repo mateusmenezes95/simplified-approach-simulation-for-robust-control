@@ -15,6 +15,7 @@ run bluerov2_models
 state_vector_size = size(nominal_model.discrete_state_space.Ad, 1);
 
 is_to_plot_generated_trajectory = false;
+save_graph_flag = false;
 
 waypoints = {
 	{[0 0 5   0  ],  0};
@@ -42,7 +43,7 @@ for i=2:length(waypoints)
 end
 
 desired.pose = desired.trajectory;
-desired.line_spec = 'r';
+desired.line_spec = '--r';
 desired.line_width = 1.5;
 
 desired.body_fixed_vel(:, 1) = zeros(size(desired.ned_velocity, 1), 1);
@@ -62,28 +63,35 @@ end
 if is_to_plot_generated_trajectory
 	figure("Name", "desired-3d-path")
 	plot_3d_path(desired)
+	save_graph(save_graph_flag, base_path_for_fig_save)
 
 	figure("Name", "desired-trajectory")
-	desired_trajectory_args.y_labels = {'x [m]', 'y [m]', 'z [m]', '\psi [rad]'};
+	desired_trajectory_args.y_labels = {'x [m]', 'y [m]', 'z [m]', '$\psi$ [rad]'};
 	desired_trajectory_args.y_min_offset = 0.1;
 	desired_trajectory_args.y_max_offset = 0.1;
 	plot_per_dof_values(t, desired_trajectory_args, desired.trajectory)
+	save_graph(save_graph_flag, base_path_for_fig_save)
 
 	figure("Name", "pose-and-ned-velocities");
 	plot_pose_and_ned_velocity(t, desired.trajectory, desired.ned_velocity)
+	save_graph(save_graph_flag, base_path_for_fig_save)
 
 	figure("Name", "velocities-in-ned-frame")
 	desired_ned_vel_args.y_labels = {'$\dot{x}$ [m/s]', '$\dot{y}$ [m/s]', '$\dot{z}$ [m/s]', '$\dot{\psi}$ [rad/s]'};
 	desired_ned_vel_args.y_min_offset = 0.1;
 	desired_ned_vel_args.y_max_offset = 0.1;
 	plot_per_dof_values(t, desired_ned_vel_args, desired.ned_velocity)
+	save_graph(save_graph_flag, base_path_for_fig_save)
 
 	figure("Name", "velocities-in-body-fixed-frame")
 	desired_body_fixed_vel_args.y_labels = {'u [m/s]', 'v [m/s]', 'w [m/s]', 'r [rad/s]'};
 	desired_body_fixed_vel_args.y_min_offset = 0.1;
 	desired_body_fixed_vel_args.y_max_offset = 0.1;
 	plot_per_dof_values(t, desired_body_fixed_vel_args, desired.body_fixed_vel)
+	save_graph(save_graph_flag, base_path_for_fig_save)
 end
+
+writematrix(desired.body_fixed_vel, "../datalogs/trajectory_example.csv");
 
 function plot_two_arrays_in_same_chart(t, array_with_left_label, array_with_right_label, label1, label2)
 	yyaxis left

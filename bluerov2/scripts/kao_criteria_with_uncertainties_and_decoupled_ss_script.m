@@ -20,7 +20,6 @@ run bluerov2_models
 degrees_of_freedom = string(["Surge", "Sway", "Heave", "Yaw"]);
 subplot_graphs = false;
 save_graphs = false;
-base_path_for_fig_save = "/home/mateus/ufba_ws/pgcomp-ufba-latex/figuras";
 
 if ~isfolder(base_path_for_fig_save)
     disp("The folder " + base_path_for_fig_save + " does not exist!")
